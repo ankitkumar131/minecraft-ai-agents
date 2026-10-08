@@ -2,7 +2,7 @@
 
 Create a Minecraft bot from a web dashboard, give it a house-building task, and watch its live coordinates, progress and activity log. Each bot has its own profile and saved task/event history. AI providers can fail over in order without losing that history.
 
-> **Current scope:** This is a working *prototype*, not the finished autonomous civilization. A bot can build a simple stone/cobblestone house; for **cobblestone** it can attempt to collect nearby supported tree logs, craft wooden pickaxes and mine exposed stone in Survival, or request materials from server-confirmed Creative inventory. Gathering is bounded and may fail if resources are inaccessible. It **cannot** farm, gather arbitrary materials, talk to other agents, or independently pursue its stored goal yet. Minecraft-server integration has not been verified in this environment. See [the full project blueprint](docs/blueprint.md) for implementation tasks and acceptance criteria.
+> **Current scope:** This is a working *prototype*, not the finished autonomous civilization. A bot can build a simple stone/cobblestone house and perform bounded Creative item/equipment requests; for **cobblestone** it can attempt to collect nearby supported tree logs, craft wooden pickaxes and mine exposed stone in Survival, or request materials from server-confirmed Creative inventory. Gathering is bounded and may fail if resources are inaccessible. It **cannot** farm, gather arbitrary materials, talk to other agents, or independently pursue its stored goal yet. Minecraft-server integration has not been verified in this environment. See [the full project blueprint](docs/blueprint.md) for implementation tasks and acceptance criteria.
 
 Running Minecraft through a Windows launcher with a single-player world? Follow the [Windows single-player/LAN guide](docs/windows-singleplayer.md) first.
 
@@ -74,7 +74,16 @@ With `MC_ALLOWED_PLAYERS` configured, you can instead type `!Aria Build a 10x10 
 
 An online bot card shows the **actual server-reported** game mode and offers survival, creative, adventure or spectator. Select a mode and click **Change game mode**. This sends `/gamemode <mode> <bot name>` **as that bot** and waits up to five seconds for Minecraft to confirm the change. The bot must have operator/command permission on the Minecraft server. A dashboard token does **not** grant Minecraft OP permission. In a LAN world, if the bot cannot run commands, change the mode from the world owner's Minecraft chat (for example `/gamemode creative bot`) instead; the dashboard will then display the new mode. Changing game mode is blocked while a build task is running. Creative mode now fills empty inventory slots with the requested build material and skips survival mining/crafting; it does not overwrite existing items. This path has unit tests but has not been verified in a live Minecraft world.
 
-Creative grants resources and flight, **not an implementation of every requested task**. The Miner profile's goal text does not implement diamond mining: only stone/cobblestone house tasks are supported. Unsupported tasks fail without modifying the world.
+Creative grants resources and flight, **not an implementation of every requested task**. The Miner profile's goal text does not implement diamond mining. Supported requests are house builds and **single-item Creative tasks** (`place a door`, `place oak door`, `place a lantern at my location`, `equip diamond sword`). Other tasks fail rather than pretending to be complete.
+
+### Creative item catalog and item tasks
+
+Start the bot in Creative and use **Search Creative items** on its card. Search uses the *connected Minecraft version's item registry* (not a hard-coded wiki list), and shows the first 25 results and the total count. The authenticated API supports pagination: `GET /api/agents/<bot>/items?q=door&offset=25`.
+
+Type `place a door` in the task box and enter your Minecraft username. A generic word matches the **first registry item containing that word**; on Minecraft 1.21.4, `door` resolves to **iron_door**. The log names the exact item. Ask for `place an oak door` if you want oak instead. If this agent has previously completed a house, `place a door` uses its saved house entrance; `add a door to it` requires a completed house. With no house, `place a door at my location` attempts a safe position two blocks east of you. Items that cannot be placed as blocks (such as swords) can be held with `equip diamond sword`. A few hazardous blocks, including TNT, cannot be placed without an approval workflow.
+
+**Catalog access does not imply every item can be placed or that multi-step natural-language projects are implemented.** Doors and beds may require additional open space; Minecraft/server placement rules still apply. Item tasks require Creative mode and the server must confirm placement. Only the agent's own inventory is modified; `equip` does not give an item to your human player.
+
 
 ## 6. Storage, security and troubleshooting
 

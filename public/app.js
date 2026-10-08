@@ -2,6 +2,7 @@ const cards = document.querySelector('#cards');
 const message = document.querySelector('#message');
 const token = document.querySelector('#token');
 const pendingDeletes = new Set();
+const itemSearchResults = new Map();
 async function api(path, data, method) {
   const response = await fetch(path, { method: method || (data === undefined ? 'GET' : 'POST'), headers: { ...(token.value ? { authorization: `Bearer ${token.value}` } : {}), 'content-type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   const result = await response.json();
@@ -42,7 +43,7 @@ async function refresh() {
       }
       else {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
-        if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
+        if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
         if (agent.connected) {
           const modeLabel = node('label', 'Request game mode (requires bot OP permission on server)', card);
           const select = document.createElement('select'); modeLabel.append(select);
@@ -55,6 +56,11 @@ async function refresh() {
           const requestLabel = node('label', 'Builder task (currently only stone/cobblestone house shells)', card);
           const request = document.createElement('input'); request.value = 'Build a 10x10 cobblestone house at my location'; requestLabel.append(request);
           button('Send task', card, () => api(`/api/agents/${agent.profile.name}/task`, { player: player.value.trim(), request: request.value }));
+          const searchLabel = node('label', 'Search Creative items (all items for this Minecraft version)', card);
+          const search = document.createElement('input'); search.placeholder = 'e.g. door'; searchLabel.append(search);
+          button('Search items', card, async () => { itemSearchResults.set(agent.profile.name, await api(`/api/agents/${agent.profile.name}/items?q=${encodeURIComponent(search.value)}`)); });
+          const results = itemSearchResults.get(agent.profile.name);
+          if (results) node('small', `${results.total} matches; first 25: ${results.items.map(i => `${i.name}${i.placeable ? '' : ' (not directly placeable)'}`).join(', ')}`, card);
         }
       }
       if (agent.job) node('pre', `Task: ${agent.job.status} ${agent.job.progress ? `${agent.job.progress.placed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
