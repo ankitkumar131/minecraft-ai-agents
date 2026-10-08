@@ -20,7 +20,7 @@ const agents = new Map();
 const draining = new Map();
 const memory = new MemoryStore(env.MEMORY_DIR || 'data/memory');
 const providers = providersFromEnv(env);
-const recent = state => ({ profile: state.profile, connected: state.connected, status: state.status, job: state.job, events: state.events, location: state.connected && state.bot?.entity?.position ? { x: Math.floor(state.bot.entity.position.x), y: Math.floor(state.bot.entity.position.y), z: Math.floor(state.bot.entity.position.z) } : null });
+const recent = state => ({ profile: state.profile, connected: state.connected, status: state.status, job: state.job, events: state.events, gameMode: state.connected ? state.bot?.game?.gameMode ?? null : null, location: state.connected && state.bot?.entity?.position ? { x: Math.floor(state.bot.entity.position.x), y: Math.floor(state.bot.entity.position.y), z: Math.floor(state.bot.entity.position.z) } : null });
 function event(state, message) {
   if (state.retired) return;
   state.events.push({ at: new Date().toISOString(), message });
@@ -148,6 +148,25 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/agents') return reply(200, [...store.profiles.values()].map(profile => agents.has(profile.name) ? recent(agents.get(profile.name)) : { profile, connected: false, status: 'stopped', job: null, events: [] }));
   try {
     if (req.method === 'POST' && req.url === '/api/agents') return reply(201, await store.add(await body(req)));
+    const gameModeMatch = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})\/gamemode$/);
+    if (gameModeMatch && req.method === 'POST') {
+      const state = agents.get(gameModeMatch[1]);
+      if (!state?.connected) return reply(409, { error: 'Bot must be online to change game mode' });
+      if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building'].includes(state.job.status)) return reply(409, { error: 'Wait until the task finishes or cancel it first' });
+      const { mode } = await body(req);
+      if (!['survival', 'creative', 'adventure', 'spectator'].includes(mode)) return reply(400, { error: 'Invalid game mode' });
+      if (state.bot.game?.gameMode === mode) return reply(200, { gameMode: mode });
+      // The server decides: the bot must have command permission (OP).
+      state.bot.chat(`/gamemode ${mode} ${state.profile.name}`);
+      const deadline = Date.now() + 5000;
+      while (state.connected && state.bot.game?.gameMode !== mode && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+      if (state.bot.game?.gameMode !== mode) {
+        event(state, `Game mode request denied or timed out (${mode}). Bot needs server operator permission; ask the world owner to change its game mode.`);
+        return reply(403, { error: 'Minecraft did not confirm the change. This bot needs operator command permission on the server, or the world owner must set its game mode in Minecraft.' });
+      }
+      event(state, `Minecraft confirmed game mode: ${mode}`);
+      return reply(200, { gameMode: mode });
+    }
     const permissionUpdate = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})\/enable-gathering$/);
     if (permissionUpdate && req.method === 'POST') {
       const name = permissionUpdate[1];

@@ -9,7 +9,7 @@ async function api(path, data, method) {
   return result;
 }
 function node(tag, text, parent) { const element = document.createElement(tag); element.textContent = text; parent.append(element); return element; }
-function button(label, parent, callback) { const el = node('button', label, parent); el.addEventListener('click', async () => { try { await callback(); await refresh(); } catch (error) { show(error); } }); }
+function button(label, parent, callback) { const el = node('button', label, parent); el.addEventListener('click', async () => { try { message.textContent = ''; message.className = ''; await callback(); await refresh(); } catch (error) { show(error); } }); }
 function show(error) { message.textContent = error.message || String(error); message.className = 'error'; }
 async function refresh() {
   try {
@@ -20,6 +20,7 @@ async function refresh() {
       node('h3', `${agent.profile.name} — ${agent.profile.role}`, card);
       node('p', `Status: ${agent.status} · Goal: ${agent.profile.goal}`, card);
       if (agent.connected && !agent.job) node('p', 'Idle — this bot waits for a task. The Goal field does not start work automatically.', card);
+      node('p', `Minecraft game mode: ${agent.gameMode || 'unavailable'}`, card);
       node('p', agent.location ? `Live position: X ${agent.location.x} · Y ${agent.location.y} · Z ${agent.location.z}` : 'Live position: unavailable (offline or connecting)', card);
       button('View saved memory', card, async () => { const saved = await api(`/api/agents/${agent.profile.name}/memory`); alert(JSON.stringify(saved, null, 2)); });
       node('small', `Permissions: ${Object.entries(agent.profile.permissions).filter(([, value]) => value).map(([key]) => key).join(', ') || 'none'}`, card);
@@ -43,6 +44,12 @@ async function refresh() {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
         if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
         if (agent.connected) {
+          const modeLabel = node('label', 'Request game mode (requires bot OP permission on server)', card);
+          const select = document.createElement('select'); modeLabel.append(select);
+          for (const mode of ['survival', 'creative', 'adventure', 'spectator']) {
+            const option = document.createElement('option'); option.value = mode; option.textContent = mode; option.selected = mode === agent.gameMode; select.append(option);
+          }
+          button('Change game mode', card, () => api(`/api/agents/${agent.profile.name}/gamemode`, { mode: select.value }));
           const playerLabel = node('label', 'Your Minecraft username (not the bot name)', card);
           const player = document.createElement('input'); player.placeholder = 'e.g. Ankit'; playerLabel.append(player);
           const requestLabel = node('label', 'Builder task (currently only stone/cobblestone house shells)', card);
@@ -53,7 +60,6 @@ async function refresh() {
       if (agent.job) node('pre', `Task: ${agent.job.status} ${agent.job.progress ? `${agent.job.progress.placed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
       const log = document.createElement('pre'); log.textContent = agent.events.slice(-8).map(e => `${e.at} ${e.message}`).join('\n'); card.append(log);
     }
-    message.textContent = ''; message.className = '';
   } catch (error) { show(error); }
 }
 document.querySelector('#create').addEventListener('submit', async event => {

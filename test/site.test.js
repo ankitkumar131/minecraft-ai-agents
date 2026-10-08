@@ -24,3 +24,12 @@ test('accepts short grass and one-block dirt bumps but rejects structures', () =
   assert.equal(site.cuts.length, 1);
   assert.equal(site.plants.length, 1);
 });
+
+test('prefers an undisturbed site over filling a hole at player position', () => {
+  const bot = { blockAt: p => {
+    if (p.y <= 62 || (p.y === 63 && !(p.x === 0 && p.z === 0))) return { name: 'dirt', boundingBox: 'block' };
+    return { name: 'air', boundingBox: 'empty' };
+  } };
+  const site = findSite(bot, { x: 0, y: 64, z: 0 }, 5, 'cobblestone', 5);
+  assert.equal(site.fills.length, 0);
+});

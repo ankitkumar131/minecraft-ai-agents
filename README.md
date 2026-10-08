@@ -63,12 +63,18 @@ Open **http://127.0.0.1:3000/** on that machine. For a basic connectivity check 
 ## 5. Give it a build task
 
 1. For a no-supplies attempt, use **cobblestone** and enable movement, placement, breaking and crafting when creating the profile. The bot needs at least seven accessible **oak logs**, exposed **stone** within 32 blocks, and a clear space for a crafting table beside the build site. It crafts wooden pickaxes and gathers cobblestone; this can take time or fail if terrain is inaccessible. Stone blocks (as opposed to cobblestone) still require supplied inventory because ordinary stone drops cobblestone.
-2. In Minecraft, stand near a **flat, open 10×10 patch**. The bot searches within 24 blocks of your position and builds toward positive **X** and positive **Z** from its selected southwest corner. It can clear grass and level limited one-block dirt bumps/dips (at most 32 edits, with enough dug dirt to fill dips), but will **not** cut down buildings, trees or cross water. Let the bot see your character.
+2. In Minecraft, stand near a **flat, open 10×10 patch**. The bot searches within 24 blocks of your position and builds toward positive **X** and positive **Z** from its selected southwest corner. It prefers sites that do not need filling; it can clear grass and level limited one-block dirt bumps/dips (at most 32 edits, with enough dug dirt to fill dips), but will **not** cut down buildings, trees or cross water. Let the bot see your character.
 3. In Aria's dashboard card, enter **your Minecraft name** and `Build a 10x10 cobblestone house at my location`. Click **Send task**, then move out of the build footprint.
 4. Watch **task state, placed-block progress, log messages and observed X/Y/Z coordinates** on the card (updates about every 3 seconds). Click **View saved memory** to see past tasks and events. The bot verifies server-confirmed placements and inspects the final blueprint.
 5. If it fails, read the error in the card. Fix the obstruction or supply blocks and retry. Existing matching blocks count toward a resumed build. **Cancel** stops future steps but does not undo placed blocks. Test in a backed-up world.
 
 With `MC_ALLOWED_PLAYERS` configured, you can instead type `!Aria Build a 10x10 stone house at my location` in Minecraft chat. The bot will still need your position visible. A simple shell is built: **no floor, doors, windows or lighting**.
+
+### Per-player Minecraft game mode
+
+An online bot card shows the **actual server-reported** game mode and offers survival, creative, adventure or spectator. Select a mode and click **Change game mode**. This sends `/gamemode <mode> <bot name>` **as that bot** and waits up to five seconds for Minecraft to confirm the change. The bot must have operator/command permission on the Minecraft server. A dashboard token does **not** grant Minecraft OP permission. In a LAN world, if the bot cannot run commands, change the mode from the world owner's Minecraft chat (for example `/gamemode creative bot`) instead; the dashboard will then display the new mode. Changing game mode is blocked while a build task is running. Creative mode does not automatically supply materials in this prototype.
+
+The Miner profile's goal text does not implement diamond mining: only stone/cobblestone house tasks are supported. Unsupported tasks fail without modifying the world.
 
 ## 6. Storage, security and troubleshooting
 

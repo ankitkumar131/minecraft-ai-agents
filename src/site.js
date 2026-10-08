@@ -48,12 +48,12 @@ export function findSite(bot, playerPosition, size, material, radius = 24) {
       for (const dy of [0, -1, 1, -2, 2]) {
         const candidate = analyzeSite(bot, { x: start.x + dx, y: start.y + dy, z: start.z + dz }, size, material);
         if (!candidate) continue;
-        const cost = distance * 4 + candidate.cuts.length * 3 + candidate.fills.length * 3 + candidate.plants.length;
+        const cost = distance * 4 + candidate.cuts.length * 4 + candidate.fills.length * 100 + candidate.plants.length;
         if (cost < score) { best = candidate; score = cost; }
         if (cost === 0) return candidate;
       }
     }
-    if (best && distance * 4 > score) break;
+    if (best && best.fills.length === 0 && distance * 4 > score) break;
   }
   if (!best) throw new Error(`No safe ${size}x${size} site within ${radius} blocks: need natural ground with at most one-block height changes, no buildings or liquids, and enough high dirt to fill low spots.`);
   return best;
@@ -81,10 +81,25 @@ export async function prepareSite(bot, site, signal, allowed, log = () => {}) {
     while (!bot.inventory.items().some(i => i.name === 'dirt') && Date.now() < deadline) { check(); await new Promise(resolve => setTimeout(resolve, 100)); }
     const item = bot.inventory.items().find(i => i.name === 'dirt');
     if (!item) throw new Error('Not enough dirt collected to fill the low spots');
-    await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 2));
+    // A GoalNear(target) can leave the bot standing *inside* the cell to fill.
+    // Walk to an adjacent open floor cell before placing. Never place into another entity.
+    let ready = false;
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-2, 0], [2, 0], [0, -2], [0, 2]]) {
+      const x = p.x + dx, z = p.z + dz;
+      if (bot.blockAt(new Vec3(x, p.y - 1, z))?.boundingBox !== 'block' || bot.blockAt(new Vec3(x, p.y, z))?.name !== 'air' || bot.blockAt(new Vec3(x, p.y + 1, z))?.name !== 'air') continue;
+      try {
+        await bot.pathfinder.goto(new goals.GoalBlock(x, p.y, z));
+        if (Math.floor(bot.entity.position.x) !== p.x || Math.floor(bot.entity.position.z) !== p.z) { ready = true; break; }
+      } catch { /* try another approach */ }
+    }
+    if (!ready) throw new Error(`Cannot reach a safe position to fill ${p.x},${p.y},${p.z}`);
     check();
+    if (Object.values(bot.entities).some(entity => entity !== bot.entity && entity.position && Math.floor(entity.position.x) === p.x && Math.floor(entity.position.y) === p.y && Math.floor(entity.position.z) === p.z)) throw new Error(`An entity occupies the fill cell ${p.x},${p.y},${p.z}`);
     await bot.equip(item, 'hand');
     await bot.placeBlock(below, new Vec3(0, 1, 0));
+    const until = Date.now() + 2000;
+    while (bot.blockAt(target)?.name !== 'dirt' && Date.now() < until) { check(); await new Promise(resolve => setTimeout(resolve, 100)); }
+    if (bot.blockAt(target)?.name !== 'dirt') throw new Error(`Server did not confirm dirt at ${p.x},${p.y},${p.z}; check server build permissions`);
   }
   log(`Cleared ${site.plants.length} plants, leveled ${site.cuts.length} high spots and filled ${site.fills.length} low spots`);
 }
