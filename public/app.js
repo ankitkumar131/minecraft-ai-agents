@@ -63,7 +63,7 @@ async function refresh() {
           if (results) node('small', `${results.total} matches; first 25: ${results.items.map(i => `${i.name}${i.placeable ? '' : ' (not directly placeable)'}`).join(', ')}`, card);
         }
       }
-      if (agent.job) node('pre', `Task: ${agent.job.status} ${agent.job.progress ? `${agent.job.progress.placed ?? agent.job.progress.completed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
+      if (agent.job) node('pre', `Task: ${agent.job.status}${agent.job.phase ? ` — ${agent.job.phase}` : ''} ${agent.job.progress ? `${agent.job.progress.placed ?? agent.job.progress.completed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
       const log = document.createElement('pre'); log.textContent = agent.events.slice(-8).map(e => `${e.at} ${e.message}`).join('\n'); card.append(log);
     }
   } catch (error) { show(error); }

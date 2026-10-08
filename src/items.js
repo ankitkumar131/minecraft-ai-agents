@@ -140,6 +140,7 @@ export async function repairRoof(bot, house, signal, allowed, log = () => {}) {
   log(`Inspecting roof: ${missing.length} missing blocks; repairing with ${spec.material}`);
   await supplyCreative(bot, spec.material, missing.length, signal, log);
   const dirs = [[0, -1, 0], [-1, 0, 0], [1, 0, 0], [0, 0, -1], [0, 0, 1]];
+  let repaired = 0;
   for (const p of missing) {
     if (signal?.aborted || !allowed()) throw new Error('Roof repair cancelled');
     const target = new Vec3(p.x, p.y, p.z);
@@ -156,6 +157,8 @@ export async function repairRoof(bot, house, signal, allowed, log = () => {}) {
       } catch (error) { lastError = error; }
     }
     if (bot.blockAt(target)?.name !== spec.material) throw new Error(`Could not repair roof at ${p.x},${p.y},${p.z}: ${lastError?.message || 'no reachable support'}`);
+    repaired++;
+    log(`Roof repair ${repaired}/${missing.length}: verified ${p.x},${p.y},${p.z}`);
   }
   const remaining = roof.filter(p => bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== spec.material).length;
   if (remaining) throw new Error(`Roof inspection found ${remaining} missing blocks after repair`);

@@ -153,6 +153,8 @@ function submit(state, text, position) {
           const ordered = [...steps].sort((a, b) => Number(b.action === 'repair_roof') - Number(a.action === 'repair_roof'));
           for (const step of ordered) {
             if (controller.signal.aborted) throw new Error('Task cancelled');
+            job.phase = step.action + (step.item ? `: ${step.item}` : '');
+            event(state, `Starting step: ${job.phase}`);
             let result;
             if (step.action === 'repair_roof') result = await repairRoof(state.bot, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message));
             else if (step.action === 'furnish_house') {
@@ -170,6 +172,7 @@ function submit(state, text, position) {
             job.progress = { completed: job.result.steps.length, total: ordered.length + (ordered.some(s => s.action === 'furnish_house') ? 5 : 0) };
           }
           job.status = 'done';
+          job.phase = 'complete';
           event(state, 'Verified bounded plan completed');
           return;
         }
