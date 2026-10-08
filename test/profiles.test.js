@@ -7,7 +7,7 @@ import { ProfileStore, validateProfile } from '../src/profiles.js';
 
 test('validates names and defaults permissions to disabled', () => {
   assert.throws(() => validateProfile({ name: '../bad', role: 'Builder', goal: 'Build' }), /Name/);
-  assert.deepEqual(validateProfile({ name: 'Aria', role: 'Builder', goal: 'Build' }).permissions, { move: false, place: false });
+  assert.deepEqual(validateProfile({ name: 'Aria', role: 'Builder', goal: 'Build' }).permissions, { move: false, place: false, break: false, craft: false });
 });
 test('profiles persist and duplicates are rejected', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ai-players-'));

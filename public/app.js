@@ -1,6 +1,7 @@
 const cards = document.querySelector('#cards');
 const message = document.querySelector('#message');
 const token = document.querySelector('#token');
+const pendingDeletes = new Set();
 async function api(path, data, method) {
   const response = await fetch(path, { method: method || (data === undefined ? 'GET' : 'POST'), headers: { ...(token.value ? { authorization: `Bearer ${token.value}` } : {}), 'content-type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   const result = await response.json();
@@ -25,19 +26,24 @@ async function refresh() {
       card.append(document.createElement('br'));
       if (agent.status === 'stopped') {
         button('Start', card, () => api(`/api/agents/${agent.profile.name}/start`, {}));
-        button('Delete player', card, async () => {
-          if (!confirm(`Delete ${agent.profile.name} and ALL saved memory? This cannot be undone.`)) return;
+        button(pendingDeletes.has(agent.profile.name) ? 'Confirm permanent deletion' : 'Delete player', card, async () => {
+          if (!pendingDeletes.has(agent.profile.name)) { pendingDeletes.add(agent.profile.name); return; }
           await api(`/api/agents/${agent.profile.name}`, undefined, 'DELETE');
+          pendingDeletes.delete(agent.profile.name);
         });
+        if (pendingDeletes.has(agent.profile.name)) {
+          node('p', 'This permanently deletes the profile AND its saved memory.', card);
+          button('Keep player', card, () => { pendingDeletes.delete(agent.profile.name); });
+        }
       }
       else {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
-        if (agent.job && ['planning', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
+        if (agent.job && ['planning', 'finding_site', 'gathering', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
         if (agent.connected) {
           const playerLabel = node('label', 'Your Minecraft username (not the bot name)', card);
           const player = document.createElement('input'); player.placeholder = 'e.g. Ankit'; playerLabel.append(player);
           const requestLabel = node('label', 'Builder task (currently only stone/cobblestone house shells)', card);
-          const request = document.createElement('input'); request.value = 'Build a 10x10 stone house at my location'; requestLabel.append(request);
+          const request = document.createElement('input'); request.value = 'Build a 10x10 cobblestone house at my location'; requestLabel.append(request);
           button('Send task', card, () => api(`/api/agents/${agent.profile.name}/task`, { player: player.value.trim(), request: request.value }));
         }
       }
@@ -49,7 +55,7 @@ async function refresh() {
 }
 document.querySelector('#create').addEventListener('submit', async event => {
   event.preventDefault(); const form = new FormData(event.target);
-  try { await api('/api/agents', { name: form.get('name'), role: form.get('role'), personality: form.get('personality'), goal: form.get('goal'), model: form.get('model'), permissions: { move: form.has('move'), place: form.has('place') } }); event.target.reset(); await refresh(); }
+  try { await api('/api/agents', { name: form.get('name'), role: form.get('role'), personality: form.get('personality'), goal: form.get('goal'), model: form.get('model'), permissions: { move: form.has('move'), place: form.has('place'), break: form.has('break'), craft: form.has('craft') } }); event.target.reset(); await refresh(); }
   catch (error) { show(error); }
 });
 token.addEventListener('change', refresh);

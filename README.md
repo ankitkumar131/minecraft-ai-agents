@@ -2,7 +2,7 @@
 
 Create a Minecraft bot from a web dashboard, give it a house-building task, and watch its live coordinates, progress and activity log. Each bot has its own profile and saved task/event history. AI providers can fail over in order without losing that history.
 
-> **Current scope:** This is a working *prototype*, not the finished autonomous civilization. A bot can build a simple stone/cobblestone house using blocks already in its inventory. It **cannot** mine, craft, farm, talk to other agents, or independently pursue its stored goal yet. Minecraft-server integration has not been verified in this environment. See [the full project blueprint](docs/blueprint.md) for implementation tasks and acceptance criteria.
+> **Current scope:** This is a working *prototype*, not the finished autonomous civilization. A bot can build a simple stone/cobblestone house; for **cobblestone** it can attempt to collect oak logs, craft wooden pickaxes and mine exposed stone. Gathering is bounded and may fail if resources are inaccessible. It **cannot** farm, gather arbitrary materials, talk to other agents, or independently pursue its stored goal yet. Minecraft-server integration has not been verified in this environment. See [the full project blueprint](docs/blueprint.md) for implementation tasks and acceptance criteria.
 
 Running Minecraft through a Windows launcher with a single-player world? Follow the [Windows single-player/LAN guide](docs/windows-singleplayer.md) first.
 
@@ -56,15 +56,15 @@ Open **http://127.0.0.1:3000/** on that machine. For a basic connectivity check 
 
 ## 4. Create and start a player
 
-1. In **Create player**, enter a Minecraft-compatible name, e.g. `Aria` (3–16 letters/numbers/underscores), role `Builder`, personality, goal, and leave **Allow movement** and **Allow placing blocks** checked.
+1. In **Create player**, enter a Minecraft-compatible name, e.g. `Aria` (3–16 letters/numbers/underscores), role `Builder`, personality, goal, and leave **Allow movement** and **Allow placing blocks** checked; also check **Allow breaking blocks** and **Allow crafting tools** to enable gathering. Existing profiles created before these options were added have them disabled: stop and delete the old profile, then recreate it with the new permissions.
 2. Click **Create player**. Click **Start** on Aria's card. Wait for **online**; if it stays offline or shows an error, check the app terminal, server address, server version, connection mode and account.
-3. A new profile persists in `data/profiles.json`. Starting a profile creates a separate Mineflayer connection; stopping it disconnects the bot. To remove a profile, click **Stop**, then **Delete player** and confirm. Deletion also permanently removes its saved memory.
+3. A new profile persists in `data/profiles.json`. Starting a profile creates a separate Mineflayer connection; stopping it disconnects the bot. To remove a profile, click **Stop**, then **Delete player** and **Confirm permanent deletion** (or **Keep player** to cancel). Deletion also permanently removes its saved memory.
 
 ## 5. Give it a build task
 
-1. Put **at least 242 stone blocks** in Aria's inventory for a 10×10 house. Supplying and gathering materials are not automated.
-2. In Minecraft, stand on the **southwest corner** of a flat, solid 10×10 patch. The footprint extends toward positive **X** and positive **Z** from the block under your feet. Keep five blocks of space above the ground clear. Let the bot see your character.
-3. In Aria's dashboard card, enter **your Minecraft name** and `Build a 10x10 stone house at my location`. Click **Send task**, then move out of the build footprint.
+1. For a no-supplies attempt, use **cobblestone** and enable movement, placement, breaking and crafting when creating the profile. The bot needs at least seven accessible **oak logs**, exposed **stone** within 32 blocks, and a clear space for a crafting table beside the build site. It crafts wooden pickaxes and gathers cobblestone; this can take time or fail if terrain is inaccessible. Stone blocks (as opposed to cobblestone) still require supplied inventory because ordinary stone drops cobblestone.
+2. In Minecraft, stand near a **flat, open 10×10 patch**. The bot searches within 16 blocks of your position and builds toward positive **X** and positive **Z** from its selected southwest corner. The footprint needs solid ground and five blocks of clear space above it. It does not flatten terrain or remove existing structures. Let the bot see your character.
+3. In Aria's dashboard card, enter **your Minecraft name** and `Build a 10x10 cobblestone house at my location`. Click **Send task**, then move out of the build footprint.
 4. Watch **task state, placed-block progress, log messages and observed X/Y/Z coordinates** on the card (updates about every 3 seconds). Click **View saved memory** to see past tasks and events. The bot verifies server-confirmed placements and inspects the final blueprint.
 5. If it fails, read the error in the card. Fix the obstruction or supply blocks and retry. Existing matching blocks count toward a resumed build. **Cancel** stops future steps but does not undo placed blocks. Test in a backed-up world.
 
@@ -76,7 +76,7 @@ With `MC_ALLOWED_PLAYERS` configured, you can instead type `!Aria Build a 10x10 
 - The server binds to loopback by default. To access it from another machine, binding `HTTP_HOST=0.0.0.0` requires a strong `API_TOKEN`; enter that token in the dashboard. Use a trusted network and TLS/auth reverse proxy if exposing beyond your machine. Authorized users can modify the Minecraft world.
 - **Bot won't join:** check server is running/reachable, port, auth mode and version. Each online-mode player needs its own valid account.
 - **No position:** your Minecraft player must be visible to the bot; reconnect or come closer. The dashboard shows `unavailable` while the bot is offline.
-- **Not enough blocks / obstruction / cannot place:** give bot sufficient inventory, ensure all 10×10 ground cells are solid and the 5-block-high planned volume is clear; navigation, anti-cheat and protection plugins may block placement.
+- **Not enough blocks / obstruction / cannot place:** give bot sufficient inventory, move near a flat 10×10 open area; the bot searches within 16 blocks and requires solid ground and a clear 5-block-high volume; navigation, anti-cheat and protection plugins may block placement.
 - **AI request fails:** the exact example works without Ollama. For other wording start Ollama and pull the configured model, or configure compatible API credentials. Provider errors are recorded in the task result.
 - Run `npm test` for unit tests. These do **not** replace testing on a real Minecraft server.
 

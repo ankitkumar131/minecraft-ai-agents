@@ -32,8 +32,9 @@ Minecraft Java server
 | Per-agent persisted events and completed task records | Implemented (per-name JSON files) | `src/memory.js`, `data/memory/` |
 | Provider fallback for request interpretation | Implemented | `src/ollama.js` |
 | Dashboard live coordinates, task progress and latest events | Implemented, 3-second polling | `public/` |
-| Deterministic stone/cobblestone house action | Implemented, unverified on live server | `src/plan.js`, `src/builder.js` |
-| Skills/advanced permissions/approvals, resource gathering | Planned | Phase 2 |
+| Deterministic stone/cobblestone house action and nearby flat-site search | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
+| Bounded oak→wooden pickaxe→exposed stone→cobblestone gathering | Experimental; unverified in live world | `src/gather.js` |
+| General resource gathering, advanced permissions and approvals | Planned | Phase 2 |
 | Autonomous observation/decision loop, replayable event log | Planned | Phase 3 |
 | FastAPI, Angular, SQLite/PostgreSQL, WebSocket | Planned, not shipped | Phase 4 |
 

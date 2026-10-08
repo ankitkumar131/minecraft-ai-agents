@@ -9,7 +9,7 @@ export function validateProfile(input) {
   const personality = String(input.personality || '').trim();
   const goal = String(input.goal || '').trim();
   if (!role || role.length > 80 || personality.length > 300 || !goal || goal.length > 500) throw new Error('Invalid role, personality or goal');
-  const permissions = { move: input.permissions?.move === true, place: input.permissions?.place === true };
+  const permissions = { move: input.permissions?.move === true, place: input.permissions?.place === true, break: input.permissions?.break === true, craft: input.permissions?.craft === true };
   const model = String(input.model || 'qwen2.5:7b').trim();
   if (!model || model.length > 100) throw new Error('Invalid model');
   return { name, role, personality, goal, permissions, model };

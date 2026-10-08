@@ -3,7 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node src/index.js", "test": "node --test"},
-  "engines": {"node": ">=20"},
-  "dependencies": {"mineflayer": "^4.39.0", "mineflayer-pathfinder": "^2.4.5"}
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "minecraft-data": "^3.117.0",
+    "mineflayer": "^4.39.0",
+    "mineflayer-collectblock": "^1.6.0",
+    "mineflayer-pathfinder": "^2.4.5"
+  }
 }

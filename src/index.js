@@ -7,6 +7,9 @@ import { buildHouse } from './builder.js';
 import { interpret, providersFromEnv } from './ollama.js';
 import { MemoryStore } from './memory.js';
 import { ProfileStore } from './profiles.js';
+import collectBlock from 'mineflayer-collectblock';
+import { findSite } from './site.js';
+import { gatherForHouse } from './gather.js';
 
 const env = process.env;
 const host = env.HTTP_HOST || '127.0.0.1';
@@ -37,6 +40,7 @@ function start(profile) {
       username: profile.name, auth: env.MC_AUTH || 'offline', version: env.MC_VERSION || undefined });
     state.bot = bot;
     bot.loadPlugin(pathfinder);
+    bot.loadPlugin(collectBlock.plugin);
     bot.on('spawn', () => { bot.pathfinder.setMovements(new Movements(bot)); state.connected = true; state.status = 'online'; event(state, 'Joined Minecraft'); });
     bot.on('end', () => { state.connected = false; state.status = 'offline'; state.controller?.abort(); event(state, 'Disconnected'); });
     bot.on('error', error => {
@@ -71,6 +75,7 @@ function stop(state) {
   state.retired = true;
   state.controller?.abort();
   state.bot?.pathfinder?.stop();
+  void state.bot?.collectBlock?.cancelTask().catch(() => {});
   try { state.bot?.quit(); } catch (error) { console.error('Bot quit failed:', error); }
   agents.delete(state.profile.name);
   if (state.taskPromise) {
@@ -82,7 +87,7 @@ function stop(state) {
 function submit(state, text, position) {
   if (!state.connected) throw new Error('Agent is not online');
   if (!state.profile.permissions.move || !state.profile.permissions.place) throw new Error('Move and place permissions required');
-  if (state.job && ['planning', 'building'].includes(state.job.status)) throw new Error('Agent is busy');
+  if (state.job && ['planning', 'finding_site', 'gathering', 'building'].includes(state.job.status)) throw new Error('Agent is busy');
   const controller = new AbortController();
   state.controller = controller;
   const job = { status: 'planning', request: text };
@@ -93,8 +98,13 @@ function submit(state, text, position) {
       const spec = await interpret(text, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.spec = spec;
+      job.status = 'finding_site';
+      job.origin = findSite(state.bot, position, spec.size, spec.material);
+      event(state, `Selected flat site at ${job.origin.x}, ${job.origin.y}, ${job.origin.z}`);
+      job.status = 'gathering';
+      await gatherForHouse(state.bot, job.origin, spec, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.craft, message => event(state, message));
+      if (controller.signal.aborted) throw new Error('Cancelled');
       job.status = 'building';
-      job.origin = { x: Math.floor(position.x), y: Math.floor(position.y) - 1, z: Math.floor(position.z) };
       event(state, `Building ${spec.size}x${spec.size} ${spec.material} house`);
       job.result = await buildHouse(state.bot, job.origin, spec, progress => { job.progress = progress; if (progress.placed % 20 === 0) event(state, `Placed ${progress.placed}/${progress.total} blocks`); }, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place);
       job.status = 'done'; event(state, 'House completed');
@@ -150,7 +160,7 @@ const server = createServer(async (req, res) => {
     const state = agents.get(profile.name);
     if (!state) throw new Error('Agent is not started');
     if (match[2] === 'stop') { stop(state); return reply(200, { stopped: true }); }
-    if (match[2] === 'cancel') { state.controller?.abort(); state.bot.pathfinder.stop(); return reply(200, { cancelled: !!state.controller }); }
+    if (match[2] === 'cancel') { state.controller?.abort(); state.bot.pathfinder.stop(); void state.bot.collectBlock?.cancelTask().catch(() => {}); return reply(200, { cancelled: !!state.controller }); }
     const { request, player } = await body(req);
     if (typeof request !== 'string' || !request.trim() || request.length > 300) throw new Error('Invalid task');
     const position = state.bot.players[player]?.entity?.position;
