@@ -34,3 +34,17 @@ node -e "console.log(require('minecraft-data').supportedVersions.pc.slice(-25))"
 ```
 
 Create a **new test world** in a version shown in that list (for example vanilla Java `1.21.4`) and open *that* world to LAN. Set `MC_PORT` to the new displayed LAN port and optionally `MC_VERSION=1.21.4`. **Do not open the existing 26.3 world with an older Minecraft version**: downgrading a world can corrupt or lose blocks/data. Back it up first; keep it for when Mineflayer adds 26.3 support. Setting `MC_VERSION=1.21.4` while the actual world/server is still 26.3 does **not** make the protocols compatible.
+
+### `connect ECONNREFUSED 127.0.0.1:2556`
+
+This means the bot reached the Windows TCP stack, but nothing is listening on **that port**. It is not an AI-provider or profile-form error. Keep the game running inside the world; open it to LAN and read the exact port shown in the Minecraft chat after **Start LAN World**. The port may change every time the LAN session starts. Put that value in `MC_PORT`, save `.env`, restart Node, then click **Stop** (if shown) and **Start** on the bot card. `127.0.0.1` works only when Minecraft and Node run on the same PC. If they run on different computers, use the game PC's LAN IPv4 address in `MC_HOST` and allow the LAN port through Windows Firewall.
+
+On the **same Windows PC** with the world open to LAN, check the port in a PowerShell window:
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 2556
+```
+
+Replace `2556` with the currently displayed port. `TcpTestSucceeded : False` means the game isn't listening there: first check whether the LAN world is still open and whether the port changed. If it says `True` but the bot still cannot connect, verify that Node is running on the same machine and examine the app terminal and firewall rules. `netstat -ano | findstr :2556` in Command Prompt can also show whether a process is listening on that port. Do not test from a cloud/sandbox preview with `localhost`; it is a different computer.
+
+Note that a profile goal such as “house with bed, chest and crafting table” is **not implemented** by the current builder; those fields describe a future agent goal and cannot add furniture to the existing simple stone-shell build.

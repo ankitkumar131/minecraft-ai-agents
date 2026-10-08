@@ -39,8 +39,15 @@ function start(profile) {
     bot.on('end', () => { state.connected = false; state.status = 'offline'; state.controller?.abort(); event(state, 'Disconnected'); });
     bot.on('error', error => {
       state.status = 'error';
-      event(state, `Connection error: ${error.message}`);
-      if (/No data available for version|unsupported.*version/i.test(error.message)) {
+      // Mineflayer can emit the same socket error twice in quick succession.
+      const message = String(error.message);
+      if (state.lastError === message && Date.now() - state.lastErrorAt < 5000) return;
+      state.lastError = message;
+      state.lastErrorAt = Date.now();
+      event(state, `Connection error: ${message}`);
+      if (/ECONNREFUSED/i.test(message)) {
+        event(state, `No Minecraft server is accepting connections at ${env.MC_HOST || 'localhost'}:${env.MC_PORT || 25565}. Keep the world open to LAN, check the port shown in Minecraft chat, then restart the bot.`);
+      } else if (/No data available for version|unsupported.*version/i.test(message)) {
         event(state, 'Minecraft version is not supported by the installed Mineflayer protocol data. Use a separate, backed-up world on a supported Java version; changing MC_VERSION alone cannot make an incompatible server work.');
       }
     });
