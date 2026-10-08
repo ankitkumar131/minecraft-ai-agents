@@ -53,7 +53,7 @@ async function refresh() {
           button('Change game mode', card, () => api(`/api/agents/${agent.profile.name}/gamemode`, { mode: select.value }));
           const playerLabel = node('label', 'Your Minecraft username (not the bot name)', card);
           const player = document.createElement('input'); player.placeholder = 'e.g. Ankit'; playerLabel.append(player);
-          const requestLabel = node('label', 'Builder task (currently only stone/cobblestone house shells)', card);
+          const requestLabel = node('label', 'Task (house, Creative item, or add items to the completed house)', card);
           const request = document.createElement('input'); request.value = 'Build a 10x10 cobblestone house at my location'; requestLabel.append(request);
           button('Send task', card, () => api(`/api/agents/${agent.profile.name}/task`, { player: player.value.trim(), request: request.value }));
           const searchLabel = node('label', 'Search Creative items (all items for this Minecraft version)', card);
@@ -63,7 +63,7 @@ async function refresh() {
           if (results) node('small', `${results.total} matches; first 25: ${results.items.map(i => `${i.name}${i.placeable ? '' : ' (not directly placeable)'}`).join(', ')}`, card);
         }
       }
-      if (agent.job) node('pre', `Task: ${agent.job.status} ${agent.job.progress ? `${agent.job.progress.placed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
+      if (agent.job) node('pre', `Task: ${agent.job.status} ${agent.job.progress ? `${agent.job.progress.placed ?? agent.job.progress.completed}/${agent.job.progress.total}` : ''}\n${agent.job.error || ''}`, card);
       const log = document.createElement('pre'); log.textContent = agent.events.slice(-8).map(e => `${e.at} ${e.message}`).join('\n'); card.append(log);
     }
   } catch (error) { show(error); }
