@@ -37,7 +37,7 @@ test('roof repair fills a missing roof block and verifies it', async () => {
     blockAt: p => ({ name: p.y === 69 && broken.has(`${p.x},${p.y},${p.z}`) ? 'air' : 'cobblestone', boundingBox: 'block', position: p }),
     inventory: { items: () => [{ name: 'cobblestone', count: 64 }] },
     equip: async () => {},
-    creative: { flyTo: async p => { bot.entity.position = p; } },
+    creative: { startFlying: () => {} },
     placeBlock: async (ref, face) => { broken.delete(ref.position.plus(face).toString().replace(/[() ]/g, '')); }
   };
   // Vec3.toString is '(0, 69, 0)'; the mock converts it to a coordinate key.

@@ -1,5 +1,5 @@
 import { Vec3 } from 'vec3';
-import { approachPlacement } from './placement.js';
+import { approachPlacement, approachInterior, flyCreative } from './placement.js';
 import { supplyCreative } from './creative.js';
 import { housePlan } from './plan.js';
 
@@ -87,8 +87,10 @@ export async function runItemTask(bot, intent, position, lastHouse, signal, allo
     // Two-block-high doors would intersect a bot hovering directly over them.
     const beside = new Vec3(target.x + 0.5, target.y, target.z - 1.5);
     if (bot.blockAt(new Vec3(target.x, target.y, target.z - 2))?.name !== 'air' || bot.blockAt(new Vec3(target.x, target.y + 1, target.z - 2))?.name !== 'air') throw new Error('Door approach needs two clear blocks outside the entrance');
-    await bot.creative.flyTo(beside);
+    await flyCreative(bot, beside, signal);
     if (bot.entity.position.distanceTo(target.offset(0.5, 0.5, 0.5)) > 3.5) throw new Error('Bot cannot reach the door position');
+  } else if (lastHouse && (intent.context === 'to it' || intent.context === 'in the house' || (!intent.context && (bed || lamp || ['chest', 'crafting_table', 'furnace'].includes(item.name))))) {
+    await approachInterior(bot, lastHouse.origin, lastHouse.spec.size, target, signal, log);
   } else await approachPlacement(bot, target, signal);
   if (!allowed() || signal?.aborted) throw new Error('Item task cancelled or Place permission revoked');
   if (bot.blockAt(target)?.name !== 'air') throw new Error('Target changed while approaching');
