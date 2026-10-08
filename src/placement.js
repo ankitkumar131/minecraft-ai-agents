@@ -1,6 +1,7 @@
 import { Vec3 } from 'vec3';
 import pathfinderPackage from 'mineflayer-pathfinder';
 const { goals } = pathfinderPackage;
+import { clearFlightLine, findFlightRoute } from './flight-route.js';
 
 export async function boundedMove(promise, description, timeoutMs, signal) {
   if (signal?.aborted) throw new Error('Movement cancelled');
@@ -34,34 +35,35 @@ export async function flyCreative(bot, destination, signal, timeoutMs = 20000) {
   if (bot.entity.position.distanceTo(destination) > 0.75) throw new Error('Minecraft server corrected the Creative flight position');
 }
 
-export async function approachInterior(bot, origin, size, target, signal, log = () => {}) {
-  const pos = bot.entity.position;
-  const inside = pos.x > origin.x + 1 && pos.x < origin.x + size - 1 && pos.z > origin.z + 1 && pos.z < origin.z + size - 1 && pos.y > origin.y && pos.y < origin.y + 4.5;
-  if (inside) return approachPlacement(bot, target, signal);
-  const x = origin.x + Math.floor(size / 2);
-  const entrance = new Vec3(x, origin.y + 1, origin.z);
-  if (bot.blockAt(entrance)?.name !== 'air' || bot.blockAt(entrance.offset(0, 1, 0))?.name !== 'air') {
-    throw new Error('House entrance is blocked (possibly by an iron door). Finish interior before installing the door, or clear the entrance. No blocks were broken.');
-  }
-  const waypoints = [
-    new Vec3(pos.x, origin.y + 8, pos.z),
-    new Vec3(x + 0.5, origin.y + 8, origin.z - 2.5),
-    new Vec3(x + 0.5, origin.y + 1, origin.z - 2.5),
-    new Vec3(x + 0.5, origin.y + 1, origin.z + 1.5)
-  ];
+export async function navigateCreative(bot, destination, signal, log = () => {}, timeoutMs = 20000) {
+  if (signal?.aborted) throw new Error('Creative navigation cancelled');
+  // Test the whole swept path, not merely its destination. A direct ascent from
+  // inside a closed house would otherwise try to fly through the roof.
+  const direct = !bot.blockAt || clearFlightLine(bot, bot.entity.position, destination);
+  const waypoints = direct ? [destination] : findFlightRoute(bot, bot.entity.position, destination);
+  if (!direct) log(`Direct flight blocked; rerouting via ${waypoints.length} clear-air waypoint(s)`);
   for (const [index, waypoint] of waypoints.entries()) {
-    if (signal?.aborted) throw new Error('Interior navigation cancelled');
-    log(`Navigating to house interior: waypoint ${index + 1}/${waypoints.length}`);
-    await flyCreative(bot, waypoint, signal);
+    if (signal?.aborted) throw new Error('Creative navigation cancelled');
+    if (!direct) log(`Flying around obstruction: waypoint ${index + 1}/${waypoints.length} at ${waypoint.x.toFixed(1)},${waypoint.y.toFixed(1)},${waypoint.z.toFixed(1)}`);
+    await flyCreative(bot, waypoint, signal, Math.max(timeoutMs, waypoint.distanceTo(bot.entity.position) * 200 + 5000));
   }
-  await approachPlacement(bot, target, signal);
 }
 
-export async function approachPlacement(bot, target, signal, timeoutMs = 20000) {
+export async function approachInterior(bot, origin, size, target, signal, log = () => {}) {
+  const entrance = new Vec3(origin.x + Math.floor(size / 2), origin.y + 1, origin.z);
+  const p = bot.entity.position;
+  const outside = p.x < origin.x + 1 || p.x > origin.x + size - 1 || p.z < origin.z + 1 || p.z > origin.z + size - 1 || p.y > origin.y + 4.5;
+  if (outside && bot.blockAt(entrance)?.name !== 'air' && bot.blockAt(entrance.offset(0, 1, 0))?.name !== 'air') {
+    log('Entrance is closed; searching for another clear route without breaking blocks');
+  }
+  await approachPlacement(bot, target, signal, 20000, log);
+}
+
+export async function approachPlacement(bot, target, signal, timeoutMs = 20000, log = () => {}) {
   if (signal?.aborted) throw new Error('Build cancelled');
   if (bot.game?.gameMode === 'creative') {
     const hover = new Vec3(target.x + 0.5, target.y + 1.5, target.z + 0.5);
-    await flyCreative(bot, hover, signal, timeoutMs);
+    await navigateCreative(bot, hover, signal, log, timeoutMs);
   } else {
     await boundedMove(bot.pathfinder.goto(new goals.GoalNear(target.x, target.y, target.z, 2)), `Path to ${target.x},${target.y},${target.z}`, timeoutMs, signal);
   }

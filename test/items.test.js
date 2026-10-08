@@ -34,7 +34,7 @@ test('roof repair fills a missing roof block and verifies it', async () => {
   const bot = {
     game: { gameMode: 'creative' }, registry,
     entity: { position: new Vec3(0, 70, 0) },
-    blockAt: p => ({ name: p.y === 69 && broken.has(`${p.x},${p.y},${p.z}`) ? 'air' : 'cobblestone', boundingBox: 'block', position: p }),
+    blockAt: p => { const name = p.y >= 70 || (p.y === 69 && broken.has(`${p.x},${p.y},${p.z}`)) ? 'air' : 'cobblestone'; return { name, boundingBox: name === 'air' ? 'empty' : 'block', position: p }; },
     inventory: { items: () => [{ name: 'cobblestone', count: 64 }] },
     equip: async () => {},
     creative: { startFlying: () => {} },

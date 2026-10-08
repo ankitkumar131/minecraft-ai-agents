@@ -32,7 +32,7 @@ Minecraft Java server
 | Per-agent persisted events and completed task records | Implemented (per-name JSON files) | `src/memory.js`, `data/memory/` |
 | Provider fallback for request interpretation | Implemented | `src/ollama.js` |
 | Dashboard live coordinates, task progress and latest events | Implemented, 3-second polling | `public/` |
-| Deterministic stone/cobblestone house action, Creative hover placement, nearby natural-site selection and bounded vegetation/soil preparation | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
+| Deterministic stone/cobblestone house action, bounded obstacle-aware Creative flight and hover placement, nearby natural-site selection and bounded vegetation/soil preparation | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
 | Bounded nearby logs→wooden pickaxe→exposed stone→cobblestone gathering; Creative inventory provisioning | Experimental; unverified in live world | `src/gather.js` |
 | Versioned Creative item catalog, bounded placement/equip/household follow-ups and roof repair | Implemented; live placement unverified | `src/items.js`, `src/creative.js` |
 | Bounded provider-backed compound task planner and safe executor | Implemented for house/furnishing actions; no general world agent | `src/agent-planner.js`, `src/index.js` |
