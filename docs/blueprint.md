@@ -33,7 +33,7 @@ Minecraft Java server
 | Provider fallback for request interpretation | Implemented | `src/ollama.js` |
 | Dashboard live coordinates, task progress and latest events | Implemented, 3-second polling | `public/` |
 | Deterministic stone/cobblestone house action and nearby natural-site selection and bounded vegetation/soil preparation | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
-| Bounded oak→wooden pickaxe→exposed stone→cobblestone gathering | Experimental; unverified in live world | `src/gather.js` |
+| Bounded nearby logs→wooden pickaxe→exposed stone→cobblestone gathering; Creative inventory provisioning | Experimental; unverified in live world | `src/gather.js` |
 | General resource gathering, advanced permissions and approvals | Planned | Phase 2 |
 | Autonomous observation/decision loop, replayable event log | Planned | Phase 3 |
 | FastAPI, Angular, SQLite/PostgreSQL, WebSocket | Planned, not shipped | Phase 4 |

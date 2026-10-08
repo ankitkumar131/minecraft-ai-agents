@@ -10,6 +10,9 @@ import { ProfileStore } from './profiles.js';
 import collectBlock from 'mineflayer-collectblock';
 import { findSite, prepareSite } from './site.js';
 import { gatherForHouse } from './gather.js';
+import { supplyCreative } from './creative.js';
+import { housePlan } from './plan.js';
+import { Vec3 } from 'vec3';
 
 const env = process.env;
 const host = env.HTTP_HOST || '127.0.0.1';
@@ -98,7 +101,7 @@ function submit(state, text, position) {
       const spec = await interpret(text, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.spec = spec;
-      if (!state.profile.permissions.break || !state.profile.permissions.craft) {
+      if (state.bot.game?.gameMode !== 'creative' && (!state.profile.permissions.break || !state.profile.permissions.craft)) {
         const amount = state.bot.inventory.items().filter(i => i.name === spec.material).reduce((n, i) => n + i.count, 0);
         if (amount < (spec.size * spec.size + 4 * (spec.size * 4 - 4) - 2)) throw new Error('This profile lacks Break/Craft permissions for automatic gathering. Use Enable gathering on its dashboard card and retry.');
       }
@@ -107,9 +110,15 @@ function submit(state, text, position) {
       job.origin = site.origin;
       event(state, `Selected site at ${job.origin.x}, ${job.origin.y}, ${job.origin.z}`);
       job.status = 'preparing_site';
+      if (state.bot.game?.gameMode === 'creative' && site.fills.length) await supplyCreative(state.bot, 'dirt', site.fills.length, controller.signal, message => event(state, message));
       await prepareSite(state.bot, site, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.place, message => event(state, message));
       job.status = 'gathering';
-      await gatherForHouse(state.bot, job.origin, spec, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.craft, message => event(state, message));
+      if (state.bot.game?.gameMode === 'creative') {
+        const required = housePlan(job.origin, spec.size).filter(p => state.bot.blockAt(new Vec3(p.x, p.y, p.z))?.name === 'air').length;
+        await supplyCreative(state.bot, spec.material, required, controller.signal, message => event(state, message));
+      } else {
+        await gatherForHouse(state.bot, job.origin, spec, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.craft, message => event(state, message));
+      }
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.status = 'building';
       event(state, `Building ${spec.size}x${spec.size} ${spec.material} house`);

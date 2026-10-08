@@ -17,17 +17,27 @@ async function craft(bot, data, name, times, table) {
 
 async function makePickaxe(bot, data, site, signal, allowed, log) {
   if (bot.inventory.items().filter(i => i.name.endsWith('_pickaxe')).length >= 6) return;
-  const wood = 'oak_log';
+  const woods = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak']
+    .filter(kind => data.blocksByName[`${kind}_log`] && data.itemsByName[`${kind}_planks`]);
+  const selected = woods.find(kind => count(bot, `${kind}_log`) >= 7);
+  const candidates = woods.map(kind => ({ kind, block: bot.findBlock({ matching: data.blocksByName[`${kind}_log`].id, maxDistance: 48,
+    useExtraInfo: b => exposed(bot, b) && !(b.position.x >= site.x && b.position.x < site.x + 10 && b.position.z >= site.z && b.position.z < site.z + 10) }) }))
+    .filter(entry => entry.block).sort((a, b) => a.block.position.distanceTo(bot.entity.position) - b.block.position.distanceTo(bot.entity.position));
+  const kind = selected || candidates[0]?.kind;
+  if (!kind) throw new Error('No exposed oak, spruce, birch, jungle, acacia or other supported logs within 48 blocks');
+  const wood = `${kind}_log`, planks = `${kind}_planks`;
   for (let attempts = 0; count(bot, wood) < 7 && attempts < 18; attempts++) {
     check(signal, allowed);
-    const block = bot.findBlock({ matching: data.blocksByName[wood].id, maxDistance: 32,
-      useExtraInfo: b => exposed(bot, b) && Math.abs(b.position.x - site.x) > 2 && Math.abs(b.position.z - site.z) > 2 });
-    if (!block) throw new Error('No accessible oak logs nearby to craft a wooden pickaxe');
+    const block = bot.findBlock({ matching: data.blocksByName[wood].id, maxDistance: 48,
+      useExtraInfo: b => exposed(bot, b) && !(b.position.x >= site.x && b.position.x < site.x + 10 && b.position.z >= site.z && b.position.z < site.z + 10) });
+    if (!block) throw new Error(`Only ${count(bot, wood)}/7 ${kind} logs collected; no more exposed logs within 48 blocks`);
+    const before = count(bot, wood);
     await bot.collectBlock.collect(block);
-    log(`Collected oak logs: ${count(bot, wood)}/7`);
+    if (count(bot, wood) === before && attempts >= 2) throw new Error(`Breaking ${kind} logs produced no collected items. Check survival mode, drops, reachability and server rules.`);
+    log(`Collected ${kind} logs: ${count(bot, wood)}/7`);
   }
   check(signal, allowed);
-  if (count(bot, 'oak_planks') < 28) await craft(bot, data, 'oak_planks', 7, null);
+  if (count(bot, planks) < 28) await craft(bot, data, planks, 7, null);
   if (count(bot, 'stick') < 12) await craft(bot, data, 'stick', 3, null);
   if (!count(bot, 'crafting_table')) await craft(bot, data, 'crafting_table', 1, null);
   // Place our own table outside the build footprint; never overwrite existing blocks.
