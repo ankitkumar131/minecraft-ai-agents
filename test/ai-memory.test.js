@@ -16,6 +16,9 @@ test('memory isolated by agent and persists across store instances and provider 
     assert.equal((await reopened.get('Aria')).events.length, 1);
     assert.equal((await reopened.get('Bruno')).tasks.length, 0);
     assert.throws(() => reopened.path('../escape'), /Invalid/);
+    await reopened.remove('Aria');
+    assert.deepEqual(await reopened.get('Aria'), { agent: 'Aria', events: [], tasks: [] });
+    assert.equal((await reopened.get('Bruno')).events.length, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 test('provider failover preserves validated structured output and never leaks keys', async () => {

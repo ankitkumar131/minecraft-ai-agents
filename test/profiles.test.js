@@ -19,5 +19,9 @@ test('profiles persist and duplicates are rejected', async () => {
     const loaded = new ProfileStore(path);
     await loaded.load();
     assert.equal(loaded.profiles.get('Aria').goal, 'Build');
+    await loaded.remove('Aria');
+    const afterDelete = new ProfileStore(path);
+    await afterDelete.load();
+    assert.equal(afterDelete.profiles.has('Aria'), false);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

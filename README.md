@@ -58,7 +58,7 @@ Open **http://127.0.0.1:3000/** on that machine. For a basic connectivity check 
 
 1. In **Create player**, enter a Minecraft-compatible name, e.g. `Aria` (3–16 letters/numbers/underscores), role `Builder`, personality, goal, and leave **Allow movement** and **Allow placing blocks** checked.
 2. Click **Create player**. Click **Start** on Aria's card. Wait for **online**; if it stays offline or shows an error, check the app terminal, server address, server version, connection mode and account.
-3. A new profile persists in `data/profiles.json`. Starting a profile creates a separate Mineflayer connection; stopping it disconnects the bot.
+3. A new profile persists in `data/profiles.json`. Starting a profile creates a separate Mineflayer connection; stopping it disconnects the bot. To remove a profile, click **Stop**, then **Delete player** and confirm. Deletion also permanently removes its saved memory.
 
 ## 5. Give it a build task
 

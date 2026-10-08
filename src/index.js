@@ -14,10 +14,12 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !env.API_TOKEN) throw n
 const store = new ProfileStore(env.PROFILES_FILE || 'data/profiles.json');
 await store.load();
 const agents = new Map();
+const draining = new Map();
 const memory = new MemoryStore(env.MEMORY_DIR || 'data/memory');
 const providers = providersFromEnv(env);
 const recent = state => ({ profile: state.profile, connected: state.connected, status: state.status, job: state.job, events: state.events, location: state.connected && state.bot?.entity?.position ? { x: Math.floor(state.bot.entity.position.x), y: Math.floor(state.bot.entity.position.y), z: Math.floor(state.bot.entity.position.z) } : null });
 function event(state, message) {
+  if (state.retired) return;
   state.events.push({ at: new Date().toISOString(), message });
   if (state.events.length > 100) state.events.shift();
   void memory.record(state.profile.name, 'event', { message }).catch(error => console.error('Memory write failed:', error));
@@ -66,10 +68,16 @@ function start(profile) {
   return state;
 }
 function stop(state) {
+  state.retired = true;
   state.controller?.abort();
   state.bot?.pathfinder?.stop();
   try { state.bot?.quit(); } catch (error) { console.error('Bot quit failed:', error); }
   agents.delete(state.profile.name);
+  if (state.taskPromise) {
+    const pending = state.taskPromise.catch(error => console.error('Task drain failed:', error));
+    draining.set(state.profile.name, pending);
+    void pending.finally(() => { if (draining.get(state.profile.name) === pending) draining.delete(state.profile.name); });
+  }
 }
 function submit(state, text, position) {
   if (!state.connected) throw new Error('Agent is not online');
@@ -80,7 +88,7 @@ function submit(state, text, position) {
   const job = { status: 'planning', request: text };
   state.job = job;
   event(state, `Planning: ${text}`);
-  void (async () => {
+  state.taskPromise = (async () => {
     try {
       const spec = await interpret(text, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
       if (controller.signal.aborted) throw new Error('Cancelled');
@@ -123,6 +131,17 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/agents') return reply(200, [...store.profiles.values()].map(profile => agents.has(profile.name) ? recent(agents.get(profile.name)) : { profile, connected: false, status: 'stopped', job: null, events: [] }));
   try {
     if (req.method === 'POST' && req.url === '/api/agents') return reply(201, await store.add(await body(req)));
+    const deletion = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})$/);
+    if (deletion && req.method === 'DELETE') {
+      const name = deletion[1];
+      if (!store.profiles.has(name)) return reply(404, { error: 'Unknown agent' });
+      if (agents.has(name)) return reply(409, { error: 'Stop the agent before deleting it' });
+      await draining.get(name);
+      // Remove the persisted profile before its history; on memory failure the API reports it.
+      await store.remove(name);
+      await memory.remove(name);
+      return reply(200, { deleted: true });
+    }
     const match = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})\/(start|stop|task|cancel)$/);
     if (!match || req.method !== 'POST') return reply(404, { error: 'Not found' });
     const profile = store.profiles.get(match[1]);

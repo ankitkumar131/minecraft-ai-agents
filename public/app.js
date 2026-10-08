@@ -1,8 +1,8 @@
 const cards = document.querySelector('#cards');
 const message = document.querySelector('#message');
 const token = document.querySelector('#token');
-async function api(path, data) {
-  const response = await fetch(path, { method: data === undefined ? 'GET' : 'POST', headers: { ...(token.value ? { authorization: `Bearer ${token.value}` } : {}), 'content-type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
+async function api(path, data, method) {
+  const response = await fetch(path, { method: method || (data === undefined ? 'GET' : 'POST'), headers: { ...(token.value ? { authorization: `Bearer ${token.value}` } : {}), 'content-type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
   return result;
@@ -22,7 +22,13 @@ async function refresh() {
       button('View saved memory', card, async () => { const saved = await api(`/api/agents/${agent.profile.name}/memory`); alert(JSON.stringify(saved, null, 2)); });
       node('small', `Permissions: ${Object.entries(agent.profile.permissions).filter(([, value]) => value).map(([key]) => key).join(', ') || 'none'}`, card);
       card.append(document.createElement('br'));
-      if (agent.status === 'stopped') button('Start', card, () => api(`/api/agents/${agent.profile.name}/start`, {}));
+      if (agent.status === 'stopped') {
+        button('Start', card, () => api(`/api/agents/${agent.profile.name}/start`, {}));
+        button('Delete player', card, async () => {
+          if (!confirm(`Delete ${agent.profile.name} and ALL saved memory? This cannot be undone.`)) return;
+          await api(`/api/agents/${agent.profile.name}`, undefined, 'DELETE');
+        });
+      }
       else {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
         if (agent.job && ['planning', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));

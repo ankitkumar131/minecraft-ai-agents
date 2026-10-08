@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // Files are keyed by validated Minecraft names, never by untrusted paths.
@@ -10,6 +10,11 @@ export class MemoryStore {
     catch (error) { if (error.code === 'ENOENT') return { agent: name, events: [], tasks: [] }; throw error; }
   }
   async settled(name) { await this.pending.get(name); return this.get(name); }
+  async remove(name) {
+    await this.pending.get(name)?.catch(() => {});
+    await rm(this.path(name), { force: true });
+    this.pending.delete(name);
+  }
   record(name, kind, data) {
     const prior = this.pending.get(name) || Promise.resolve();
     const next = prior.catch(() => {}).then(async () => {
