@@ -13,7 +13,7 @@ import { gatherForHouse } from './gather.js';
 import { supplyCreative } from './creative.js';
 import { housePlan } from './plan.js';
 import { Vec3 } from 'vec3';
-import { parseItemIntent, findItems, runItemTask, runItemSequence } from './items.js';
+import { parseItemIntent, findItems, runItemTask, runItemSequence, repairRoof } from './items.js';
 
 const env = process.env;
 const host = env.HTTP_HOST || '127.0.0.1';
@@ -105,7 +105,13 @@ function submit(state, text, position) {
         const saved = await memory.settled(state.profile.name);
         const prior = [...saved.tasks].reverse().find(task => task.status === 'done' && task.spec?.size && task.origin);
         job.status = 'placing_item';
-        if (itemIntent.action === 'item_sequence') {
+        if (itemIntent.action === 'repair_roof') {
+          if (!prior) throw new Error('No completed house in this agent’s saved memory to repair');
+          if (state.bot.game?.gameMode !== 'creative') throw new Error('Roof repair requires Creative mode');
+          job.result = await repairRoof(state.bot, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message));
+          job.status = 'done';
+          event(state, `Roof repair completed: ${job.result.repaired} blocks`);
+        } else if (itemIntent.action === 'item_sequence') {
           job.result = await runItemSequence(state.bot, itemIntent, position, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message), progress => { job.progress = progress; });
           job.status = 'done';
           event(state, `Item sequence completed: ${job.result.items.map(i => i.item).join(', ')}`);

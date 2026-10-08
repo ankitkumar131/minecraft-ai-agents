@@ -6,17 +6,19 @@ import { housePlan } from './plan.js';
 const forbidden = new Set(['tnt', 'lava_bucket', 'fire_charge', 'flint_and_steel', 'command_block', 'chain_command_block', 'repeating_command_block', 'structure_block', 'jigsaw', 'bedrock', 'barrier', 'end_portal_frame']);
 
 export function parseItemIntent(text) {
+  if (/^repair\s+(?:the\s+)?roof(?:\s+(?:of\s+)?(?:the\s+)?house)?[.!]?$/i.test(text.trim())) return { action: 'repair_roof', context: 'to it' };
   const multi = text.trim().match(/^add\s+(.+?)\s+to\s+it[.!]?$/i);
   if (multi && /,|\s+and\s+/i.test(multi[1])) {
     const queries = multi[1].split(/\s*,\s*|\s+and\s+/i).map(part => part.trim().replace(/^(?:a|an|some)\s+/i, '').replace(/\s+/g, '_').toLowerCase());
     if (queries.length < 2 || queries.length > 6 || queries.some(q => !/^[a-z0-9_]{2,80}$/.test(q))) throw new Error('Use 2–6 item names separated by commas');
     return { action: 'item_sequence', queries, context: 'to it' };
   }
-  const match = text.trim().match(/^(place|add|equip|hold)\s+(?:(?:a|an|some)\s+)?(.+?)(?:\s+(at my location|to it|in the house))?[.!]?$/i);
+  const match = text.trim().match(/^(place|add|equip|hold)\s+(?:(?:a|an|some)\s+)?(.+?)(?:\s+(at my location|to it|in the house|inside(?: the)? house))?[.!]?$/i);
   if (!match) return null;
   const query = match[2].trim().replace(/^minecraft:/i, '').replace(/\s+/g, '_').toLowerCase();
   if (!/^[a-z0-9_]{2,80}$/.test(query)) throw new Error('Use an item name, such as oak door, door, or diamond sword');
-  return { action: ['equip', 'hold'].includes(match[1].toLowerCase()) ? 'equip_item' : 'place_item', query, context: match[3] || null };
+  const context = match[3]?.toLowerCase().startsWith('inside') ? 'in the house' : match[3] || null;
+  return { action: ['equip', 'hold'].includes(match[1].toLowerCase()) ? 'equip_item' : 'place_item', query, context };
 }
 
 export function findItems(registry, query, offset = 0, limit = 25) {
@@ -52,7 +54,7 @@ export async function runItemTask(bot, intent, position, lastHouse, signal, allo
   const bed = item.name.endsWith('_bed');
   const lamp = item.name.includes('lamp') || item.name.includes('lantern');
   let target;
-  if (lastHouse && (intent.context === 'to it' || intent.context === 'in the house' || (door && !intent.context))) {
+  if (lastHouse && (intent.context === 'to it' || intent.context === 'in the house' || ((door || bed || lamp) && !intent.context))) {
     const { origin, spec } = lastHouse;
     target = door ? new Vec3(origin.x + Math.floor(spec.size / 2), origin.y + 1, origin.z)
       : lamp ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + 2)
@@ -107,10 +109,7 @@ export async function runItemSequence(bot, intent, position, lastHouse, signal, 
     if (forbidden.has(item.name) || !bot.registry.blocksByName[item.name]) throw new Error(`${item.name} cannot be safely placed`);
   }
   if (intent.queries.includes('roof')) {
-    const { origin, spec } = lastHouse;
-    const missing = housePlan(origin, spec.size).filter(p => p.y === origin.y + 5 && bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== spec.material);
-    if (missing.length) throw new Error(`House roof has ${missing.length} missing blocks; roof repair is not yet supported`);
-    log(`Verified existing ${spec.size}x${spec.size} roof; no new roof needed`);
+    await repairRoof(bot, lastHouse, signal, allowed, log);
   }
   const results = [];
   for (const query of intent.queries) {
@@ -121,4 +120,39 @@ export async function runItemSequence(bot, intent, position, lastHouse, signal, 
     progress({ completed: results.length, total: intent.queries.length, results });
   }
   return { items: results };
+}
+
+export async function repairRoof(bot, house, signal, allowed, log = () => {}) {
+  const { origin, spec } = house;
+  const roof = housePlan(origin, spec.size).filter(p => p.y === origin.y + 5);
+  const missing = roof.filter(p => bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== spec.material);
+  if (!missing.length) { log(`Verified existing ${spec.size}x${spec.size} roof`); return { repaired: 0 }; }
+  if (!allowed()) throw new Error('Move and Place permissions required to repair the roof');
+  for (const p of missing) {
+    if (bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== 'air') throw new Error(`Roof obstruction at ${p.x},${p.y},${p.z}; refusing to overwrite it`);
+  }
+  log(`Inspecting roof: ${missing.length} missing blocks; repairing with ${spec.material}`);
+  await supplyCreative(bot, spec.material, missing.length, signal, log);
+  const dirs = [[0, -1, 0], [-1, 0, 0], [1, 0, 0], [0, 0, -1], [0, 0, 1]];
+  for (const p of missing) {
+    if (signal?.aborted || !allowed()) throw new Error('Roof repair cancelled');
+    const target = new Vec3(p.x, p.y, p.z);
+    if (bot.blockAt(target)?.name === spec.material) continue;
+    await bot.equip(bot.inventory.items().find(i => i.name === spec.material), 'hand');
+    await approachPlacement(bot, target, signal);
+    let lastError;
+    for (const [dx, dy, dz] of dirs) {
+      const reference = bot.blockAt(target.offset(dx, dy, dz));
+      if (reference?.boundingBox !== 'block') continue;
+      try {
+        await bot.placeBlock(reference, new Vec3(-dx, -dy, -dz));
+        if (bot.blockAt(target)?.name === spec.material) break;
+      } catch (error) { lastError = error; }
+    }
+    if (bot.blockAt(target)?.name !== spec.material) throw new Error(`Could not repair roof at ${p.x},${p.y},${p.z}: ${lastError?.message || 'no reachable support'}`);
+  }
+  const remaining = roof.filter(p => bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== spec.material).length;
+  if (remaining) throw new Error(`Roof inspection found ${remaining} missing blocks after repair`);
+  log(`Roof repaired and verified: ${missing.length} blocks`);
+  return { repaired: missing.length };
 }

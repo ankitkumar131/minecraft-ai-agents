@@ -34,7 +34,7 @@ Minecraft Java server
 | Dashboard live coordinates, task progress and latest events | Implemented, 3-second polling | `public/` |
 | Deterministic stone/cobblestone house action, Creative hover placement, nearby natural-site selection and bounded vegetation/soil preparation | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
 | Bounded nearby logs→wooden pickaxe→exposed stone→cobblestone gathering; Creative inventory provisioning | Experimental; unverified in live world | `src/gather.js` |
-| Versioned Creative item catalog, bounded single-item placement/equip | Implemented; live placement unverified | `src/items.js`, `src/creative.js` |
+| Versioned Creative item catalog, bounded placement/equip/household follow-ups and roof repair | Implemented; live placement unverified | `src/items.js`, `src/creative.js` |
 | General resource gathering, advanced permissions and approvals | Planned | Phase 2 |
 | Autonomous observation/decision loop, replayable event log | Planned | Phase 3 |
 | FastAPI, Angular, SQLite/PostgreSQL, WebSocket | Planned, not shipped | Phase 4 |
