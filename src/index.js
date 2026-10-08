@@ -225,7 +225,7 @@ function submit(state, text, position) {
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.status = 'building';
       event(state, `Building ${spec.size}x${spec.size} ${spec.material} house`);
-      job.result = await buildHouse(state.bot, job.origin, spec, progress => { job.progress = progress; if (progress.placed % 20 === 0) event(state, `Placed ${progress.placed}/${progress.total} blocks`); }, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place);
+      job.result = await buildHouse(state.bot, job.origin, spec, progress => { job.progress = progress; if (progress.placed % 20 === 0) event(state, `Placed ${progress.placed}/${progress.total} blocks`); }, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message));
       job.status = 'done'; event(state, 'House completed');
     } catch (error) {
       job.status = controller.signal.aborted ? 'cancelled' : 'failed'; job.error = error.message;

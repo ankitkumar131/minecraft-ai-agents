@@ -28,7 +28,7 @@ export async function createStarterVillage(bot, playerPosition, previousHouses, 
     await prepareSite(bot, site, signal, permissions, log);
     const missing = housePlan(origin, VILLAGE_SPEC.size).filter(p => bot.blockAt(new Vec3(p.x, p.y, p.z))?.name === 'air').length;
     await supplyCreative(bot, VILLAGE_SPEC.material, missing, signal, log);
-    await buildHouse(bot, origin, VILLAGE_SPEC, p => { if (p.placed % 20 === 0) log(`Village house ${index + 1}/3: ${p.placed}/${p.total} blocks`); }, signal, permissions);
+    await buildHouse(bot, origin, VILLAGE_SPEC, p => { if (p.placed % 20 === 0) log(`Village house ${index + 1}/3: ${p.placed}/${p.total} blocks`); }, signal, permissions, log);
     if (!verified(bot, origin)) throw new Error(`Village house ${index + 1} failed final inspection`);
     built.push({ origin, spec: { ...VILLAGE_SPEC } });
     progress(built);
