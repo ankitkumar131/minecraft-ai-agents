@@ -37,7 +37,13 @@ function start(profile) {
     bot.loadPlugin(pathfinder);
     bot.on('spawn', () => { bot.pathfinder.setMovements(new Movements(bot)); state.connected = true; state.status = 'online'; event(state, 'Joined Minecraft'); });
     bot.on('end', () => { state.connected = false; state.status = 'offline'; state.controller?.abort(); event(state, 'Disconnected'); });
-    bot.on('error', error => { state.status = 'error'; event(state, `Connection error: ${error.message}`); });
+    bot.on('error', error => {
+      state.status = 'error';
+      event(state, `Connection error: ${error.message}`);
+      if (/No data available for version|unsupported.*version/i.test(error.message)) {
+        event(state, 'Minecraft version is not supported by the installed Mineflayer protocol data. Use a separate, backed-up world on a supported Java version; changing MC_VERSION alone cannot make an incompatible server work.');
+      }
+    });
     bot.on('kicked', reason => event(state, `Kicked: ${String(reason).slice(0, 200)}`));
     bot.on('chat', (username, message) => {
       if (username === bot.username || !message.toLowerCase().startsWith(`!${profile.name.toLowerCase()} `)) return;

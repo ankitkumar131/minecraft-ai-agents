@@ -24,3 +24,13 @@ For a private offline-mode LAN world, `MC_AUTH=offline` uses the profile name as
 Minecraft version and server protocol must also be compatible with Mineflayer. A newest snapshot or modded release (including a Fabric-loader entry) may not yet be supported. If the bot is kicked with an unsupported protocol/version error, try an officially supported Java server version and set `MC_VERSION` accordingly. Fabric is not required by this project. A dedicated Java server with a fixed port is more predictable for long-running agents than Open to LAN.
 
 **Remember:** the bot must already carry enough blocks for the builder task, be able to see your character, and have movement/place permissions. Watch the application terminal and agent card for connection/build errors. See the [main README](../README.md) for the build walkthrough and safety precautions.
+
+### `No data available for version 26.3`
+
+The game/server is **26.3**, but the installed Mineflayer/Minecraft protocol data does not contain that version. The bot cannot join it, even if the dashboard and AI provider are working. As checked with this repository's current installed dependencies, versions include `1.20.4`, `1.21.4`, `1.21.11` and `26.1`, but **not `26.3`**. Support can change after dependency updates; inspect your install with:
+
+```sh
+node -e "console.log(require('minecraft-data').supportedVersions.pc.slice(-25))"
+```
+
+Create a **new test world** in a version shown in that list (for example vanilla Java `1.21.4`) and open *that* world to LAN. Set `MC_PORT` to the new displayed LAN port and optionally `MC_VERSION=1.21.4`. **Do not open the existing 26.3 world with an older Minecraft version**: downgrading a world can corrupt or lose blocks/data. Back it up first; keep it for when Mineflayer adds 26.3 support. Setting `MC_VERSION=1.21.4` while the actual world/server is still 26.3 does **not** make the protocols compatible.
