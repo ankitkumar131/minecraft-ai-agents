@@ -35,6 +35,7 @@ Minecraft Java server
 | Deterministic stone/cobblestone house action, Creative hover placement, nearby natural-site selection and bounded vegetation/soil preparation | Implemented, unverified on live server | `src/plan.js`, `src/site.js`, `src/builder.js` |
 | Bounded nearby logs→wooden pickaxe→exposed stone→cobblestone gathering; Creative inventory provisioning | Experimental; unverified in live world | `src/gather.js` |
 | Versioned Creative item catalog, bounded placement/equip/household follow-ups and roof repair | Implemented; live placement unverified | `src/items.js`, `src/creative.js` |
+| Bounded provider-backed compound task planner and safe executor | Implemented for house/furnishing actions; no general world agent | `src/agent-planner.js`, `src/index.js` |
 | General resource gathering, advanced permissions and approvals | Planned | Phase 2 |
 | Autonomous observation/decision loop, replayable event log | Planned | Phase 3 |
 | FastAPI, Angular, SQLite/PostgreSQL, WebSocket | Planned, not shipped | Phase 4 |

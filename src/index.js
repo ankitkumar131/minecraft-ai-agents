@@ -4,14 +4,15 @@ const { pathfinder, Movements } = pathfinderPackage;
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { buildHouse } from './builder.js';
-import { interpret, providersFromEnv } from './ollama.js';
+import { providersFromEnv } from './ollama.js';
 import { MemoryStore } from './memory.js';
 import { ProfileStore } from './profiles.js';
 import collectBlock from 'mineflayer-collectblock';
 import { findSite, prepareSite } from './site.js';
 import { gatherForHouse } from './gather.js';
 import { supplyCreative } from './creative.js';
-import { housePlan } from './plan.js';
+import { housePlan, parseCommand } from './plan.js';
+import { planTask } from './agent-planner.js';
 import { Vec3 } from 'vec3';
 import { parseItemIntent, findItems, runItemTask, runItemSequence, repairRoof } from './items.js';
 
@@ -122,7 +123,57 @@ function submit(state, text, position) {
         }
         return;
       }
-      const spec = await interpret(text, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
+      const directHouse = parseCommand(text);
+      let spec = directHouse;
+      if (!spec) {
+        const saved = await memory.settled(state.profile.name);
+        const prior = [...saved.tasks].reverse().find(task => task.status === 'done' && task.spec?.size && task.origin);
+        const observation = {
+          agent: { name: state.profile.name, role: state.profile.role, goal: state.profile.goal.slice(0, 200) },
+          mode: state.bot.game?.gameMode, botPosition: state.bot.entity?.position,
+          playerPosition: position, lastHouse: prior ? { origin: prior.origin, size: prior.spec.size, material: prior.spec.material } : null,
+          inventory: state.bot.inventory.items().slice(0, 36).map(i => ({ name: i.name, count: i.count }))
+        };
+        const planned = await planTask(text, observation, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
+        const steps = planned.steps;
+        if (steps.length === 1 && steps[0].action === 'build_house') spec = steps[0];
+        else {
+          if (state.bot.game?.gameMode !== 'creative') throw new Error('Creative mode is required for house furnishing and roof-repair actions');
+          if (!prior) throw new Error('No completed house in this agent’s saved memory to modify');
+          if (/roof/i.test(text) && !steps.some(s => s.action === 'repair_roof')) steps.unshift({ action: 'repair_roof' });
+          if (/interior/i.test(text) && !steps.some(s => s.action === 'furnish_house')) steps.push({ action: 'furnish_house' });
+          if (/door/i.test(text) && !steps.some(s => s.action === 'place_item' && s.item.includes('door'))) steps.push({ action: 'place_item', item: 'door' });
+          if (steps.length > 8) throw new Error('Plan exceeds eight actions; split this request into smaller tasks');
+          job.spec = { action: 'planned_actions', steps, provider: planned.provider };
+          event(state, `Planner: ${planned.provider}`);
+          job.status = 'placing_item';
+          job.result = { steps: [] };
+          event(state, `Plan: ${steps.map(s => s.action + (s.item ? ':' + s.item : '')).join(' → ')}`);
+          // Repairs first, then fixtures; never overwrite existing matching items.
+          const ordered = [...steps].sort((a, b) => Number(b.action === 'repair_roof') - Number(a.action === 'repair_roof'));
+          for (const step of ordered) {
+            if (controller.signal.aborted) throw new Error('Task cancelled');
+            let result;
+            if (step.action === 'repair_roof') result = await repairRoof(state.bot, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message));
+            else if (step.action === 'furnish_house') {
+              const items = [];
+              event(state, 'Furnishing starter interior: bed, chest, crafting table, furnace, lantern');
+              for (const item of ['bed', 'chest', 'crafting_table', 'furnace', 'lantern']) {
+                if (controller.signal.aborted) throw new Error('Task cancelled');
+                items.push(await runItemTask(state.bot, { action: 'place_item', query: item, context: 'in the house' }, position, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message)));
+                job.result.steps.push({ action: 'furnish_item', item: items.at(-1).item });
+                job.progress = { completed: job.result.steps.length, total: ordered.length + 5 };
+              }
+              result = { items };
+            } else result = await runItemTask(state.bot, { action: step.action, query: step.item, context: step.action === 'place_item' ? 'in the house' : null }, position, prior, controller.signal, () => state.profile.permissions.move && state.profile.permissions.place, message => event(state, message));
+            job.result.steps.push({ action: step.action, result });
+            job.progress = { completed: job.result.steps.length, total: ordered.length + (ordered.some(s => s.action === 'furnish_house') ? 5 : 0) };
+          }
+          job.status = 'done';
+          event(state, 'Verified bounded plan completed');
+          return;
+        }
+      }
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.spec = spec;
       if (state.bot.game?.gameMode !== 'creative' && (!state.profile.permissions.break || !state.profile.permissions.craft)) {

@@ -6,6 +6,8 @@ import { housePlan } from './plan.js';
 const forbidden = new Set(['tnt', 'lava_bucket', 'fire_charge', 'flint_and_steel', 'command_block', 'chain_command_block', 'repeating_command_block', 'structure_block', 'jigsaw', 'bedrock', 'barrier', 'end_portal_frame']);
 
 export function parseItemIntent(text) {
+  // Multi-clause requests belong to the AI planner, never to the item-name lookup.
+  if (/\b(all|everything|interior items|also|then|fix|repair)\b/i.test(text) && !/^repair\s+(?:the\s+)?roof/i.test(text.trim())) return null;
   if (/^repair\s+(?:the\s+)?roof(?:\s+(?:of\s+)?(?:the\s+)?house)?[.!]?$/i.test(text.trim())) return { action: 'repair_roof', context: 'to it' };
   const multi = text.trim().match(/^add\s+(.+?)\s+to\s+it[.!]?$/i);
   if (multi && /,|\s+and\s+/i.test(multi[1])) {
@@ -16,7 +18,8 @@ export function parseItemIntent(text) {
   const match = text.trim().match(/^(place|add|equip|hold)\s+(?:(?:a|an|some)\s+)?(.+?)(?:\s+(at my location|to it|in the house|inside(?: the)? house))?[.!]?$/i);
   if (!match) return null;
   const query = match[2].trim().replace(/^minecraft:/i, '').replace(/\s+/g, '_').toLowerCase();
-  if (!/^[a-z0-9_]{2,80}$/.test(query)) throw new Error('Use an item name, such as oak door, door, or diamond sword');
+  if (!/^[a-z0-9_]{2,80}$/.test(query)) return null;
+  if (query.split('_').length > 4) return null;
   const context = match[3]?.toLowerCase().startsWith('inside') ? 'in the house' : match[3] || null;
   return { action: ['equip', 'hold'].includes(match[1].toLowerCase()) ? 'equip_item' : 'place_item', query, context };
 }
@@ -54,10 +57,13 @@ export async function runItemTask(bot, intent, position, lastHouse, signal, allo
   const bed = item.name.endsWith('_bed');
   const lamp = item.name.includes('lamp') || item.name.includes('lantern');
   let target;
-  if (lastHouse && (intent.context === 'to it' || intent.context === 'in the house' || ((door || bed || lamp) && !intent.context))) {
+  if (lastHouse && (intent.context === 'to it' || intent.context === 'in the house' || ((door || bed || lamp || ['chest', 'crafting_table', 'furnace'].includes(item.name)) && !intent.context))) {
     const { origin, spec } = lastHouse;
     target = door ? new Vec3(origin.x + Math.floor(spec.size / 2), origin.y + 1, origin.z)
-      : lamp ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + 2)
+      : lamp ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + spec.size - 3)
+        : item.name === 'chest' ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + 2)
+          : item.name === 'crafting_table' ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + 3)
+            : item.name === 'furnace' ? new Vec3(origin.x + spec.size - 3, origin.y + 1, origin.z + 4)
         : bed ? new Vec3(origin.x + 2, origin.y + 1, origin.z + 2)
           : new Vec3(origin.x + Math.floor(spec.size / 2), origin.y + 1, origin.z + 2);
   } else if (intent.context === 'to it' || intent.context === 'in the house') {
