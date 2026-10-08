@@ -13,6 +13,7 @@ import { gatherForHouse } from './gather.js';
 import { supplyCreative } from './creative.js';
 import { housePlan, parseCommand } from './plan.js';
 import { planTask } from './agent-planner.js';
+import { createStarterVillage } from './village.js';
 import { Vec3 } from 'vec3';
 import { parseItemIntent, findItems, runItemTask, runItemSequence, repairRoof } from './items.js';
 
@@ -92,7 +93,7 @@ function stop(state) {
 function submit(state, text, position) {
   if (!state.connected) throw new Error('Agent is not online');
   if (!state.profile.permissions.move || !state.profile.permissions.place) throw new Error('Move and place permissions required');
-  if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item'].includes(state.job.status)) throw new Error('Agent is busy');
+  if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item', 'building_village'].includes(state.job.status)) throw new Error('Agent is busy');
   const controller = new AbortController();
   state.controller = controller;
   const job = { status: 'planning', request: text };
@@ -137,7 +138,28 @@ function submit(state, text, position) {
         const planned = await planTask(text, observation, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
         const steps = planned.steps;
         if (steps.length === 1 && steps[0].action === 'build_house') spec = steps[0];
-        else {
+        else if (steps.length === 1 && steps[0].action === 'create_village') {
+          job.spec = { action: 'create_village', houses: 3, provider: planned.provider };
+          job.status = 'building_village';
+          job.phase = 'finding first site';
+          job.result = { houses: [] };
+          event(state, `Planner: ${planned.provider}; starter village = three 7x7 cobblestone houses`);
+          const previous = saved.tasks.filter(t => t.status === 'done' && t.spec?.size && t.origin)
+            .map(t => ({ origin: t.origin, spec: t.spec }));
+          const interrupted = [...saved.tasks].reverse().find(t => t.request === text && t.spec?.action === 'create_village' && t.result?.houses?.length && t.status !== 'done');
+          const resume = interrupted?.result.houses || [];
+          job.result = await createStarterVillage(state.bot, position, previous, resume, controller.signal,
+            () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.place,
+            message => event(state, message), houses => {
+              job.result = { houses: [...houses] };
+              job.progress = { completed: houses.length, total: 3 };
+              job.phase = `house ${houses.length}/3 verified`;
+            });
+          job.status = 'done';
+          job.phase = 'starter village complete';
+          event(state, 'Starter village complete: three inspected houses');
+          return;
+        } else {
           if (state.bot.game?.gameMode !== 'creative') throw new Error('Creative mode is required for house furnishing and roof-repair actions');
           if (!prior) throw new Error('No completed house in this agent’s saved memory to modify');
           if (/roof/i.test(text) && !steps.some(s => s.action === 'repair_roof')) steps.unshift({ action: 'repair_roof' });
@@ -249,7 +271,7 @@ const server = createServer(async (req, res) => {
     if (gameModeMatch && req.method === 'POST') {
       const state = agents.get(gameModeMatch[1]);
       if (!state?.connected) return reply(409, { error: 'Bot must be online to change game mode' });
-      if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item'].includes(state.job.status)) return reply(409, { error: 'Wait until the task finishes or cancel it first' });
+      if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item', 'building_village'].includes(state.job.status)) return reply(409, { error: 'Wait until the task finishes or cancel it first' });
       const { mode } = await body(req);
       if (!['survival', 'creative', 'adventure', 'spectator'].includes(mode)) return reply(400, { error: 'Invalid game mode' });
       if (state.bot.game?.gameMode === mode) return reply(200, { gameMode: mode });

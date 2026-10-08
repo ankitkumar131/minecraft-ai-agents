@@ -43,7 +43,7 @@ async function refresh() {
       }
       else {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
-        if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
+        if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building', 'placing_item', 'building_village'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
         if (agent.connected) {
           const modeLabel = node('label', 'Request game mode (requires bot OP permission on server)', card);
           const select = document.createElement('select'); modeLabel.append(select);

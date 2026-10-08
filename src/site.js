@@ -39,14 +39,17 @@ export function inspectSite(bot, origin, size, material) {
     Array.from({ length: size * size }, (_, i) => at(bot, origin.x + i % size, origin.y, origin.z + Math.floor(i / size))?.boundingBox === 'block').every(Boolean);
 }
 
-export function findSite(bot, playerPosition, size, material, radius = 24) {
+export function findSite(bot, playerPosition, size, material, radius = 24, reserved = [], requireEmpty = false) {
   const start = { x: Math.floor(playerPosition.x), y: Math.floor(playerPosition.y) - 1, z: Math.floor(playerPosition.z) };
   let best = null, score = Infinity;
   for (let distance = 0; distance <= radius; distance++) {
     for (let dx = -distance; dx <= distance; dx++) for (let dz = -distance; dz <= distance; dz++) {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== distance) continue;
       for (const dy of [0, -1, 1, -2, 2]) {
-        const candidate = analyzeSite(bot, { x: start.x + dx, y: start.y + dy, z: start.z + dz }, size, material);
+        const origin = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
+        if (reserved.some(h => origin.x < h.x + h.size + 3 && origin.x + size + 3 > h.x && origin.z < h.z + h.size + 3 && origin.z + size + 3 > h.z)) continue;
+        if (requireEmpty && housePlan(origin, size).some(p => at(bot, p.x, p.y, p.z)?.name === material)) continue;
+        const candidate = analyzeSite(bot, origin, size, material);
         if (!candidate) continue;
         const cost = distance * 4 + candidate.cuts.length * 4 + candidate.fills.length * 100 + candidate.plants.length;
         if (cost < score) { best = candidate; score = cost; }

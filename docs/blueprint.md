@@ -36,6 +36,7 @@ Minecraft Java server
 | Bounded nearby logs→wooden pickaxe→exposed stone→cobblestone gathering; Creative inventory provisioning | Experimental; unverified in live world | `src/gather.js` |
 | Versioned Creative item catalog, bounded placement/equip/household follow-ups and roof repair | Implemented; live placement unverified | `src/items.js`, `src/creative.js` |
 | Bounded provider-backed compound task planner and safe executor | Implemented for house/furnishing actions; no general world agent | `src/agent-planner.js`, `src/index.js` |
+| Bounded starter village: three 7x7 shells with site separation and progress | Implemented, live-world unverified | `src/village.js` |
 | General resource gathering, advanced permissions and approvals | Planned | Phase 2 |
 | Autonomous observation/decision loop, replayable event log | Planned | Phase 3 |
 | FastAPI, Angular, SQLite/PostgreSQL, WebSocket | Planned, not shipped | Phase 4 |
