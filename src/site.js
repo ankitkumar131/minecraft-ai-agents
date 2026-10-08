@@ -2,6 +2,7 @@ import { Vec3 } from 'vec3';
 import { housePlan } from './plan.js';
 import pathfinderPackage from 'mineflayer-pathfinder';
 const { goals } = pathfinderPackage;
+import { navigateCreative, boundedMove } from './placement.js';
 
 const soil = new Set(['dirt', 'grass_block']);
 const floor = new Set(['dirt', 'grass_block', 'stone', 'cobblestone', 'sandstone']);
@@ -62,6 +63,26 @@ export function findSite(bot, playerPosition, size, material, radius = 24, reser
   return best;
 }
 
+export async function approachSiteBlock(bot, target, signal, log = () => {}) {
+  if (bot.game?.gameMode !== 'creative') {
+    await boundedMove(bot.pathfinder.goto(new goals.GoalNear(target.x, target.y, target.z, 2)), `Site path to ${target.x},${target.y},${target.z}`, 20000, signal);
+    return;
+  }
+  const failures = [];
+  for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) {
+    if (signal?.aborted) throw new Error('Site preparation cancelled');
+    const side = new Vec3(target.x + dx + 0.5, target.y + 1, target.z + dz + 0.5);
+    const foot = bot.blockAt(side.floored()), head = bot.blockAt(side.floored().offset(0, 1, 0));
+    if (!foot || !head || foot.boundingBox === 'block' || head.boundingBox === 'block') continue;
+    try {
+      await navigateCreative(bot, side, signal, log);
+      if (bot.entity.position.distanceTo(target.offset(0.5, 0.5, 0.5)) <= 4.4) return;
+      failures.push('out of reach');
+    } catch (error) { if (signal?.aborted) throw error; failures.push(error.message); }
+  }
+  throw new Error(`Cannot approach site block ${target.x},${target.y},${target.z} from a clear side: ${[...new Set(failures)].slice(-2).join('; ') || 'all sides obstructed'}`);
+}
+
 export async function prepareSite(bot, site, signal, allowed, log = () => {}) {
   const check = () => { if (signal?.aborted) throw new Error('Site preparation cancelled'); if (!allowed()) throw new Error('Move, break and place permissions required for site preparation'); };
   for (const p of [...site.plants, ...site.cuts]) {
@@ -69,7 +90,7 @@ export async function prepareSite(bot, site, signal, allowed, log = () => {}) {
     const target = new Vec3(p.x, p.y, p.z);
     const block = bot.blockAt(target);
     if (block?.name === 'air') continue;
-    await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 2));
+    await approachSiteBlock(bot, target, signal, log);
     check();
     await bot.dig(block);
   }
@@ -84,20 +105,11 @@ export async function prepareSite(bot, site, signal, allowed, log = () => {}) {
     while (!bot.inventory.items().some(i => i.name === 'dirt') && Date.now() < deadline) { check(); await new Promise(resolve => setTimeout(resolve, 100)); }
     const item = bot.inventory.items().find(i => i.name === 'dirt');
     if (!item) throw new Error('Not enough dirt collected to fill the low spots');
-    // A GoalNear(target) can leave the bot standing *inside* the cell to fill.
-    // Walk to an adjacent open floor cell before placing. Never place into another entity.
-    let ready = false;
-    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-2, 0], [2, 0], [0, -2], [0, 2]]) {
-      const x = p.x + dx, z = p.z + dz;
-      if (bot.blockAt(new Vec3(x, p.y - 1, z))?.boundingBox !== 'block' || bot.blockAt(new Vec3(x, p.y, z))?.name !== 'air' || bot.blockAt(new Vec3(x, p.y + 1, z))?.name !== 'air') continue;
-      try {
-        await bot.pathfinder.goto(new goals.GoalBlock(x, p.y, z));
-        if (Math.floor(bot.entity.position.x) !== p.x || Math.floor(bot.entity.position.z) !== p.z) { ready = true; break; }
-      } catch { /* try another approach */ }
-    }
-    if (!ready) throw new Error(`Cannot reach a safe position to fill ${p.x},${p.y},${p.z}`);
+    // From Creative flight, stand beside the hole rather than inside it.
+    // Survival retains normal pathfinder movement via the same bounded helper.
+    await approachSiteBlock(bot, target, signal, log);
     check();
-    if (Object.values(bot.entities).some(entity => entity !== bot.entity && entity.position && Math.floor(entity.position.x) === p.x && Math.floor(entity.position.y) === p.y && Math.floor(entity.position.z) === p.z)) throw new Error(`An entity occupies the fill cell ${p.x},${p.y},${p.z}`);
+    if (Object.values(bot.entities || {}).some(entity => entity !== bot.entity && entity.position && Math.floor(entity.position.x) === p.x && Math.floor(entity.position.y) === p.y && Math.floor(entity.position.z) === p.z)) throw new Error(`An entity occupies the fill cell ${p.x},${p.y},${p.z}`);
     await bot.equip(item, 'hand');
     await bot.placeBlock(below, new Vec3(0, 1, 0));
     const until = Date.now() + 2000;
