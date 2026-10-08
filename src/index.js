@@ -14,6 +14,7 @@ import { supplyCreative } from './creative.js';
 import { housePlan, parseCommand } from './plan.js';
 import { planTask } from './agent-planner.js';
 import { createStarterVillage } from './village.js';
+import { requestBlueprint, executeBlueprint } from './blueprint.js';
 import { Vec3 } from 'vec3';
 import { parseItemIntent, findItems, runItemTask, runItemSequence, repairRoof } from './items.js';
 
@@ -101,6 +102,23 @@ function submit(state, text, position) {
   event(state, `Planning: ${text}`);
   state.taskPromise = (async () => {
     try {
+      // Construction requests use the exact request, not the canned starter-village fallback.
+      if (state.bot.game?.gameMode === 'creative' && /\b(build|create|construct|make|develop)\b/i.test(text)) {
+        const observation = { mode: 'creative', playerPosition: position, botPosition: state.bot.entity?.position,
+          inventory: state.bot.inventory.items().slice(0, 36).map(i => ({ name: i.name, count: i.count })) };
+        const blueprint = await requestBlueprint(text, observation, { providers, signal: controller.signal,
+          onAttempt: name => event(state, `Requesting complete blueprint from ${name}`) });
+        job.spec = { action: 'ai_blueprint', name: blueprint.name, blocks: blueprint.blocks, provider: blueprint.provider };
+        job.phase = 'validating complete blueprint';
+        event(state, `Blueprint from ${blueprint.provider}: ${blueprint.name}, ${blueprint.blocks.length} blocks; validating before construction`);
+        job.status = 'building';
+        job.result = await executeBlueprint(state.bot, blueprint, position, controller.signal,
+          () => state.profile.permissions.move && state.profile.permissions.place,
+          message => event(state, message), value => { job.progress = value; });
+        job.status = 'done'; job.phase = 'blueprint verified';
+        event(state, `Blueprint verified: ${job.result.placed}/${job.result.total} blocks`);
+        return;
+      }
       const itemIntent = parseItemIntent(text);
       if (itemIntent) {
         job.spec = itemIntent;
