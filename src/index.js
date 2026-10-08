@@ -8,7 +8,7 @@ import { interpret, providersFromEnv } from './ollama.js';
 import { MemoryStore } from './memory.js';
 import { ProfileStore } from './profiles.js';
 import collectBlock from 'mineflayer-collectblock';
-import { findSite } from './site.js';
+import { findSite, prepareSite } from './site.js';
 import { gatherForHouse } from './gather.js';
 
 const env = process.env;
@@ -87,7 +87,7 @@ function stop(state) {
 function submit(state, text, position) {
   if (!state.connected) throw new Error('Agent is not online');
   if (!state.profile.permissions.move || !state.profile.permissions.place) throw new Error('Move and place permissions required');
-  if (state.job && ['planning', 'finding_site', 'gathering', 'building'].includes(state.job.status)) throw new Error('Agent is busy');
+  if (state.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building'].includes(state.job.status)) throw new Error('Agent is busy');
   const controller = new AbortController();
   state.controller = controller;
   const job = { status: 'planning', request: text };
@@ -98,9 +98,16 @@ function submit(state, text, position) {
       const spec = await interpret(text, { providers, signal: controller.signal, onAttempt: name => event(state, `Trying AI provider: ${name}`) });
       if (controller.signal.aborted) throw new Error('Cancelled');
       job.spec = spec;
+      if (!state.profile.permissions.break || !state.profile.permissions.craft) {
+        const amount = state.bot.inventory.items().filter(i => i.name === spec.material).reduce((n, i) => n + i.count, 0);
+        if (amount < (spec.size * spec.size + 4 * (spec.size * 4 - 4) - 2)) throw new Error('This profile lacks Break/Craft permissions for automatic gathering. Use Enable gathering on its dashboard card and retry.');
+      }
       job.status = 'finding_site';
-      job.origin = findSite(state.bot, position, spec.size, spec.material);
-      event(state, `Selected flat site at ${job.origin.x}, ${job.origin.y}, ${job.origin.z}`);
+      const site = findSite(state.bot, position, spec.size, spec.material);
+      job.origin = site.origin;
+      event(state, `Selected site at ${job.origin.x}, ${job.origin.y}, ${job.origin.z}`);
+      job.status = 'preparing_site';
+      await prepareSite(state.bot, site, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.place, message => event(state, message));
       job.status = 'gathering';
       await gatherForHouse(state.bot, job.origin, spec, controller.signal, () => state.profile.permissions.move && state.profile.permissions.break && state.profile.permissions.craft, message => event(state, message));
       if (controller.signal.aborted) throw new Error('Cancelled');
@@ -141,6 +148,14 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/agents') return reply(200, [...store.profiles.values()].map(profile => agents.has(profile.name) ? recent(agents.get(profile.name)) : { profile, connected: false, status: 'stopped', job: null, events: [] }));
   try {
     if (req.method === 'POST' && req.url === '/api/agents') return reply(201, await store.add(await body(req)));
+    const permissionUpdate = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})\/enable-gathering$/);
+    if (permissionUpdate && req.method === 'POST') {
+      const name = permissionUpdate[1];
+      if (!store.profiles.has(name)) return reply(404, { error: 'Unknown agent' });
+      const updated = await store.update(name, { break: true, craft: true });
+      if (agents.has(name)) agents.get(name).profile = updated;
+      return reply(200, updated);
+    }
     const deletion = req.url?.match(/^\/api\/agents\/([A-Za-z0-9_]{3,16})$/);
     if (deletion && req.method === 'DELETE') {
       const name = deletion[1];

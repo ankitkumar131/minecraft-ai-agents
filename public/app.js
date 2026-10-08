@@ -24,6 +24,9 @@ async function refresh() {
       button('View saved memory', card, async () => { const saved = await api(`/api/agents/${agent.profile.name}/memory`); alert(JSON.stringify(saved, null, 2)); });
       node('small', `Permissions: ${Object.entries(agent.profile.permissions).filter(([, value]) => value).map(([key]) => key).join(', ') || 'none'}`, card);
       card.append(document.createElement('br'));
+      if (!agent.profile.permissions.break || !agent.profile.permissions.craft) {
+        button('Enable gathering (break + craft)', card, () => api(`/api/agents/${agent.profile.name}/enable-gathering`, {}));
+      }
       if (agent.status === 'stopped') {
         button('Start', card, () => api(`/api/agents/${agent.profile.name}/start`, {}));
         button(pendingDeletes.has(agent.profile.name) ? 'Confirm permanent deletion' : 'Delete player', card, async () => {
@@ -38,7 +41,7 @@ async function refresh() {
       }
       else {
         button('Stop', card, () => api(`/api/agents/${agent.profile.name}/stop`, {}));
-        if (agent.job && ['planning', 'finding_site', 'gathering', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
+        if (agent.job && ['planning', 'finding_site', 'preparing_site', 'gathering', 'building'].includes(agent.job.status)) button('Cancel task', card, () => api(`/api/agents/${agent.profile.name}/cancel`, {}));
         if (agent.connected) {
           const playerLabel = node('label', 'Your Minecraft username (not the bot name)', card);
           const player = document.createElement('input'); player.placeholder = 'e.g. Ankit'; playerLabel.append(player);

@@ -28,6 +28,14 @@ export class ProfileStore {
     await writeFile(this.path + '.tmp', JSON.stringify([...this.profiles.values()], null, 2));
     await rename(this.path + '.tmp', this.path);
   }
+  async update(name, permissions) {
+    const previous = this.profiles.get(name);
+    if (!previous) throw new Error('Unknown agent');
+    const next = validateProfile({ ...previous, permissions: { ...previous.permissions, break: permissions.break === true, craft: permissions.craft === true } });
+    this.profiles.set(name, next);
+    try { await this.save(); } catch (error) { this.profiles.set(name, previous); throw error; }
+    return next;
+  }
   async remove(name) {
     const existing = this.profiles.get(name);
     if (!existing) throw new Error('Unknown agent');
