@@ -8,7 +8,14 @@ export function providersFromEnv(env = process.env) {
   if (!Array.isArray(configured) || !configured.length) throw new Error('AI_PROVIDERS must be a non-empty array');
   return configured.map((p, i) => {
     if (!p || !['ollama', 'openai-compatible'].includes(p.type) || typeof p.url !== 'string' || !/^https?:\/\//.test(p.url) || typeof p.model !== 'string' || !p.model || typeof p.name !== 'string' || !p.name) throw new Error(`Invalid provider at index ${i}`);
-    if (p.type === 'openai-compatible' && (!p.keyEnv || !env[p.keyEnv])) throw new Error(`Missing credential for provider ${p.name}`);
+    if (p.type === 'openai-compatible') {
+      // keyEnv is the *name* of a server environment variable, never the secret itself.
+      // Do not echo an invalid value: it may accidentally contain a real API key.
+      if (typeof p.keyEnv !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(p.keyEnv)) {
+        throw new Error(`Invalid keyEnv for provider ${p.name}: use an environment variable name (for example PRIMARY_AI_KEY), not an API key`);
+      }
+      if (!env[p.keyEnv]) throw new Error(`Missing credential for provider ${p.name}: set the ${p.keyEnv} environment variable in .env`);
+    }
     return { name: p.name, type: p.type, url: p.url, model: p.model, key: p.type === 'openai-compatible' ? env[p.keyEnv] : undefined };
   });
 }

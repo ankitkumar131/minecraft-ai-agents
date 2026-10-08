@@ -35,3 +35,11 @@ test('provider failover preserves validated structured output and never leaks ke
 test('unsupported plans are not silently reinterpreted by the next provider', async () => {
   await assert.rejects(interpret('please destroy world', { providers: [{ name: 'one', type: 'ollama', url: 'http://localhost', model: 'm' }, { name: 'two', type: 'ollama', url: 'http://localhost', model: 'm' }], fetchImpl: async () => ({ ok: true, json: async () => ({ response: '{"action":"unsupported"}' }) }) }), /Unsupported/);
 });
+
+test('provider keyEnv is a variable name, not a secret, and errors never print secrets', () => {
+  const provider = { name: 'cloud', type: 'openai-compatible', url: 'https://example.test/v1/', model: 'm' };
+  assert.throws(() => providersFromEnv({ AI_PROVIDERS: JSON.stringify([{ ...provider, keyEnv: 'sk-secret-value ' }]) }), /Invalid keyEnv.*variable name/);
+  assert.throws(() => providersFromEnv({ AI_PROVIDERS: JSON.stringify([{ ...provider, keyEnv: 'CLOUD_API_KEY' }]) }), /set the CLOUD_API_KEY environment variable/);
+  const parsed = providersFromEnv({ CLOUD_API_KEY: 'secret', AI_PROVIDERS: JSON.stringify([{ ...provider, keyEnv: 'CLOUD_API_KEY' }]) });
+  assert.equal(parsed[0].key, 'secret');
+});

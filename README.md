@@ -4,6 +4,8 @@ Create a Minecraft bot from a web dashboard, give it a house-building task, and 
 
 > **Current scope:** This is a working *prototype*, not the finished autonomous civilization. A bot can build a simple stone/cobblestone house using blocks already in its inventory. It **cannot** mine, craft, farm, talk to other agents, or independently pursue its stored goal yet. Minecraft-server integration has not been verified in this environment. See [the full project blueprint](docs/blueprint.md) for implementation tasks and acceptance criteria.
 
+Running Minecraft through a Windows launcher with a single-player world? Follow the [Windows single-player/LAN guide](docs/windows-singleplayer.md) first.
+
 ## 1. What you need
 
 1. **Node.js 20.6+** (Node 22 recommended) and npm. Verify: `node --version`.
