@@ -1,0 +1,9 @@
+{
+  "name": "minecraft-ai-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"start": "node src/index.js", "test": "node --test"},
+  "engines": {"node": ">=20"},
+  "dependencies": {"mineflayer": "^4.39.0", "mineflayer-pathfinder": "^2.4.5"}
+}
