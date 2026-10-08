@@ -144,8 +144,11 @@ function submit(state, text, position) {
           job.phase = 'finding first site';
           job.result = { houses: [] };
           event(state, `Planner: ${planned.provider}; starter village = three 7x7 cobblestone houses`);
-          const previous = saved.tasks.filter(t => t.status === 'done' && t.spec?.size && t.origin)
-            .map(t => ({ origin: t.origin, spec: t.spec }));
+          const previous = saved.tasks.flatMap(t => {
+            if (t.status === 'done' && t.spec?.size && t.origin) return [{ origin: t.origin, spec: t.spec }];
+            if (t.status === 'done' && t.spec?.action === 'create_village') return t.result?.houses || [];
+            return [];
+          });
           const interrupted = [...saved.tasks].reverse().find(t => t.request === text && t.spec?.action === 'create_village' && t.result?.houses?.length && t.status !== 'done');
           const resume = interrupted?.result.houses || [];
           job.result = await createStarterVillage(state.bot, position, previous, resume, controller.signal,
