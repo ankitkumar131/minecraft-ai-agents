@@ -74,7 +74,7 @@ With `MC_ALLOWED_PLAYERS` configured, you can instead type `!Aria Build a 10x10 
 
 An online bot card shows the **actual server-reported** game mode and offers survival, creative, adventure or spectator. Select a mode and click **Change game mode**. This sends `/gamemode <mode> <bot name>` **as that bot** and waits up to five seconds for Minecraft to confirm the change. The bot must have operator/command permission on the Minecraft server. A dashboard token does **not** grant Minecraft OP permission. In a LAN world, if the bot cannot run commands, change the mode from the world owner's Minecraft chat (for example `/gamemode creative bot`) instead; the dashboard will then display the new mode. Changing game mode is blocked while a build task is running. Creative mode now fills empty inventory slots with the requested build material and skips survival mining/crafting; it does not overwrite existing items. This path has unit tests but has not been verified in a live Minecraft world.
 
-The Miner profile's goal text does not implement diamond mining: only stone/cobblestone house tasks are supported. Unsupported tasks fail without modifying the world.
+Creative grants resources and flight, **not an implementation of every requested task**. The Miner profile's goal text does not implement diamond mining: only stone/cobblestone house tasks are supported. Unsupported tasks fail without modifying the world.
 
 ## 6. Storage, security and troubleshooting
 

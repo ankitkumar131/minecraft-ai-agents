@@ -1,6 +1,5 @@
 import { Vec3 } from 'vec3';
-import pathfinderPackage from 'mineflayer-pathfinder';
-const { goals } = pathfinderPackage;
+import { approachPlacement } from './placement.js';
 import { housePlan } from './plan.js';
 
 const directions = [[0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]];
@@ -33,10 +32,11 @@ export async function buildHouse(bot, origin, { size, material }, onProgress = (
     let success = false;
     let lastError;
     for (const [dx, dy, dz] of directions) {
-      const reference = bot.blockAt(target.offset(dx, dy, dz));
-      if (!solid(reference)) continue;
+      if (!solid(bot.blockAt(target.offset(dx, dy, dz)))) continue;
       try {
-        await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 3));
+        await approachPlacement(bot, target, signal);
+        const reference = bot.blockAt(target.offset(dx, dy, dz));
+        if (!solid(reference)) throw new Error('Reference block changed while moving');
         if (signal?.aborted) throw new Error('Build cancelled');
         if (!authorize()) throw new Error('Move/place permission revoked');
         // Do not place inside a player or another entity occupying this cell.
